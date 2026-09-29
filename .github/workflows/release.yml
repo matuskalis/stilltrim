@@ -1,0 +1,108 @@
+name: Release
+
+# Builds an unsigned IPA when a version tag is pushed, or when run by hand from main, and attaches it
+# to a GitHub Release. People install it with a tool that signs it with their own Apple ID.
+#
+# Two jobs on purpose. The build job runs a downloaded tool (XcodeGen) and only has a read-only token.
+# The publish job has the write token and runs nothing but the release command.
+# Not yet run on a hosted runner: the build commands were checked locally, the runner label and the
+# Xcode path below were not.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version for a manual run from main, for example 0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # A manual run is only allowed from main.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Work out the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then VERSION="$INPUT_VERSION"; else VERSION="${GITHUB_REF_NAME#v}"; fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must look like 1.2.3, got: $VERSION" >&2
+            exit 1
+          fi
+          # A manual run must not reuse a tag: the file would not match the tagged source.
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists. Push a new tag, or pick a new version." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Install XcodeGen
+        run: |
+          curl -sSL -o xg.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  xg.zip" | shasum -a 256 -c -
+          unzip -q xg.zip -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      - name: Privacy guard on the source
+        run: scripts/check-no-network.sh
+
+      - name: Build the unsigned app
+        run: |
+          xcodegen generate
+          xcodebuild -project Stilltrim.xcodeproj -scheme Stilltrim -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+
+      - name: Privacy guard on the built app
+        run: scripts/check-built-app.sh build/Build/Products/Release-iphoneos/Stilltrim.app
+
+      - name: Package the IPA
+        run: |
+          mkdir -p Payload dist
+          cp -R build/Build/Products/Release-iphoneos/Stilltrim.app Payload/
+          zip -qry "dist/Stilltrim-$VERSION-unsigned.ipa" Payload
+          (cd dist && shasum -a 256 "Stilltrim-$VERSION-unsigned.ipa" > SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: dist
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          (cd dist && sha256sum -c SHA256SUMS)
+          gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Stilltrim $VERSION" --generate-notes
