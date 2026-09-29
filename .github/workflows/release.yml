@@ -15,6 +15,10 @@ on:
       version:
         description: Version for a manual run from main, for example 0.1.0
         required: true
+      publish:
+        description: Publish a GitHub Release. Off keeps the IPA only as a build artifact, a dry run.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,6 +39,7 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then VERSION="$INPUT_VERSION"; else VERSION="${GITHUB_REF_NAME#v}"; fi
@@ -42,8 +47,8 @@ jobs:
             echo "Version must look like 1.2.3, got: $VERSION" >&2
             exit 1
           fi
-          # A manual run must not reuse a tag: the file would not match the tagged source.
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
+          # A manual run that publishes must not reuse a tag: the file would not match the tagged source.
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$PUBLISH" = "true" ] && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
             echo "Tag v$VERSION already exists. Push a new tag, or pick a new version." >&2
             exit 1
           fi
@@ -88,6 +93,8 @@ jobs:
           if-no-files-found: error
 
   publish:
+    # A tag push always publishes. A manual run publishes only when asked to.
+    if: github.event_name == 'push' || inputs.publish
     needs: build
     runs-on: ubuntu-latest
     permissions:
