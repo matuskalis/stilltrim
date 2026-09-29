@@ -1,0 +1,11 @@
+*.xcodeproj
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+build/
+App/Info.plist
+.DS_Store
+.fixtures/
+.seed/
+Config/Local.xcconfig

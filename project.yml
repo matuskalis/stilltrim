@@ -1,0 +1,60 @@
+name: PhotoCleanup
+options:
+  bundleIdPrefix: com.example
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+configFiles:
+  Debug: Config/Shared.xcconfig
+  Release: Config/Shared.xcconfig
+packages:
+  CleanupCore:
+    path: Packages/CleanupCore
+targets:
+  PhotoCleanup:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: CleanupCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Photo Cleanup
+        NSPhotoLibraryUsageDescription: Photo Cleanup scans your photos on this phone to find screenshots, duplicates and bad shots. It deletes only what you choose. Nothing leaves your phone.
+        PHPhotoLibraryPreventAutomaticLimitedAccessAlert: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "6.0"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+  PhotoCleanupUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: PhotoCleanup
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+schemes:
+  PhotoCleanup:
+    build:
+      targets:
+        PhotoCleanup: all
+    run:
+      config: Debug
+    test:
+      targets:
+        - PhotoCleanupUITests
