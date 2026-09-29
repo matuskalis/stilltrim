@@ -32,6 +32,14 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - `UITests/CleanupFlow` deletes the seeded screenshots. Reseed before running it again.
 - `UITests/ScanControl` (cancel, erase mid-scan) needs `scripts/seed-bulk.sh <UDID> 2000` and skips itself on a small library.
 
+## Repositories
+
+`origin` is the public repo matuskalis/stilltrim (MIT). `archive` is a read-only remote for the private repo matuskalis/stilltrim-archive, which keeps the history from before the public release: never push to it. A local, untracked overview memo may sit in the folder (listed in `.git/info/exclude`): never add it to git. Commits in this repo use the GitHub no-reply address. Pushing workflow files needs the `workflow` scope on the `gh` token, and the repo-local credential helper is set to use only `gh` (the macOS keychain helper holds an older token).
+
+## CI
+
+`ci.yml` and `release.yml` run on `macos-26` with Xcode 26.6, the image's default. Xcode 26.1.1 is on that image without an iOS simulator runtime, so it cannot build for a simulator there. Run the release workflow by hand with `publish` off for a dry run that only keeps the IPA as an artifact.
+
 ## Placeholders
 
 Applied 29 Sep 2026: name Stilltrim, bundle id `com.matuskalis.stilltrim`, red accent, contact-sheet icon. The accent hex values (#D12E1F light, #FF5B47 dark) stay placeholders until judged on a device. Research behind every decision: `docs/research/`.
