@@ -35,6 +35,7 @@ actor PhotoLibraryService {
     private var fetchResult: PHFetchResult<PHAsset>?
     private var indexByID: [String: Int] = [:]
     private let imageManager = PHImageManager.default()
+    private static let thumbnailTimeout = Duration.seconds(30)
     private let changeObserver = LibraryChangeObserver()
     private var isObserving = false
 
@@ -105,31 +106,43 @@ actor PhotoLibraryService {
         return details
     }
 
-    /// Never downloads from iCloud: `isNetworkAccessAllowed` stays false.
+    /// Never downloads from iCloud: `isNetworkAccessAllowed` stays false. The request ends when the
+    /// task is cancelled or after `thumbnailTimeout`, so a scan can always be stopped.
     func thumbnail(for id: String, side: CGFloat, exact: Bool) async -> ThumbnailOutcome {
         guard let asset = asset(for: id) else { return .failed }
         let manager = imageManager
-        return await withCheckedContinuation { (continuation: CheckedContinuation<ThumbnailOutcome, Never>) in
-            let options = PHImageRequestOptions()
-            options.deliveryMode = .highQualityFormat
-            options.resizeMode = exact ? .exact : .fast
-            options.isNetworkAccessAllowed = false
-            options.isSynchronous = false
-            let resumed = OSAllocatedUnfairLock(initialState: false)
-            manager.requestImage(
-                for: asset, targetSize: CGSize(width: side, height: side), contentMode: .aspectFit, options: options
-            ) { image, info in
-                // A degraded preview is never final, and a continuation must resume exactly once.
-                if (info?[PHImageResultIsDegradedKey] as? Bool) == true { return }
-                if resumed.withLock({ let already = $0; $0 = true; return already }) { return }
-                if let cgImage = image?.cgImage {
-                    continuation.resume(returning: .image(cgImage))
-                } else if (info?[PHImageResultIsInCloudKey] as? Bool) == true {
-                    continuation.resume(returning: .notOnDevice)
-                } else {
-                    continuation.resume(returning: .failed)
+        let request = ThumbnailRequest()
+        let timeout = Task {
+            do { try await Task.sleep(for: Self.thumbnailTimeout) } catch { return }
+            if let requestID = request.cancel() { manager.cancelImageRequest(requestID) }
+        }
+        defer { timeout.cancel() }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<ThumbnailOutcome, Never>) in
+                guard request.start(continuation) else { return }
+                let options = PHImageRequestOptions()
+                options.deliveryMode = .highQualityFormat
+                options.resizeMode = exact ? .exact : .fast
+                options.isNetworkAccessAllowed = false
+                options.isSynchronous = false
+                let requestID = manager.requestImage(
+                    for: asset, targetSize: CGSize(width: side, height: side), contentMode: .aspectFit, options: options
+                ) { image, info in
+                    let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) == true
+                    let inCloud = (info?[PHImageResultIsInCloudKey] as? Bool) == true
+                    // A degraded preview of a local photo is followed by the final image. A degraded
+                    // preview of an iCloud photo is all there will ever be: not scanned.
+                    if degraded && !inCloud { return }
+                    if let cgImage = image?.cgImage, !degraded {
+                        request.finish(.image(cgImage))
+                    } else {
+                        request.finish(inCloud ? .notOnDevice : .failed)
+                    }
                 }
+                if request.register(requestID) { manager.cancelImageRequest(requestID) }
             }
+        } onCancel: {
+            if let requestID = request.cancel() { manager.cancelImageRequest(requestID) }
         }
     }
 
@@ -151,5 +164,58 @@ actor PhotoLibraryService {
     private func asset(for id: String) -> PHAsset? {
         guard let index = indexByID[id], let fetchResult, index < fetchResult.count else { return nil }
         return fetchResult.object(at: index)
+    }
+}
+
+/// Owns one thumbnail request and resumes its continuation exactly once, whichever comes first:
+/// the image, a cancellation or the timeout.
+private final class ThumbnailRequest: @unchecked Sendable {
+    private struct State {
+        var continuation: CheckedContinuation<ThumbnailOutcome, Never>?
+        var requestID: PHImageRequestID?
+        var finished = false
+        var cancelled = false
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    /// False when the request was already cancelled: the continuation is resumed and nothing starts.
+    func start(_ continuation: CheckedContinuation<ThumbnailOutcome, Never>) -> Bool {
+        let cancelled = state.withLock { state -> Bool in
+            if state.cancelled { state.finished = true; return true }
+            state.continuation = continuation
+            return false
+        }
+        if cancelled { continuation.resume(returning: .failed) }
+        return !cancelled
+    }
+
+    /// True when the request is already over, so PhotoKit should be told to drop it.
+    func register(_ requestID: PHImageRequestID) -> Bool {
+        state.withLock { state in
+            state.requestID = requestID
+            return state.cancelled || state.finished
+        }
+    }
+
+    func finish(_ outcome: ThumbnailOutcome) {
+        let continuation = state.withLock { state -> CheckedContinuation<ThumbnailOutcome, Never>? in
+            guard !state.finished else { return nil }
+            state.finished = true
+            let continuation = state.continuation
+            state.continuation = nil
+            return continuation
+        }
+        continuation?.resume(returning: outcome)
+    }
+
+    /// Ends the request as failed. Returns the PhotoKit request to cancel, if it has started.
+    func cancel() -> PHImageRequestID? {
+        let requestID = state.withLock { state -> PHImageRequestID? in
+            state.cancelled = true
+            return state.requestID
+        }
+        finish(.failed)
+        return requestID
     }
 }

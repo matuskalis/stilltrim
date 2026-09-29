@@ -98,9 +98,9 @@ struct ReviewView: View {
     /// Deselecting clears everything in this category, including photos picked by hand.
     private func toggleAll() {
         if allSelectableSelected {
-            model.selection.subtract(model.result?.items(in: category).map(\.id) ?? [])
+            model.deselect(ids: Set(model.result?.items(in: category).map(\.id) ?? []))
         } else {
-            model.selection.formUnion(selectableIDs)
+            model.select(ids: selectableIDs)
         }
     }
 

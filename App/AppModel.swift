@@ -42,10 +42,9 @@ final class AppModel {
     let library = PhotoLibraryService()
     let thumbnails: ThumbnailLoader
     private(set) var scanState: ScanState = .idle
-    private(set) var result: ScanResult?
+    private var review = ReviewState()
     private(set) var lastDeletion: DeletionSummary?
     private(set) var deletionError: String?
-    var selection: Set<String> = []
     var debugOpenCategory: CleanupCategory?
 
     @ObservationIgnored private let cache = AnalysisCache()
@@ -75,6 +74,9 @@ final class AppModel {
         }
     }
 
+    var result: ScanResult? { review.result }
+    var selection: Set<String> { review.selection }
+
     var isScanning: Bool {
         if case .scanning = scanState { return true }
         return false
@@ -89,6 +91,7 @@ final class AppModel {
     func startScan() {
         guard access.canRead, !isScanning, !isErasing else { return }
         UIApplication.shared.isIdleTimerDisabled = true
+        review.beginScan()
         scanState = .scanning(ScanProgress(stage: .listing, done: 0, total: 0))
         scanGeneration += 1
         let generation = scanGeneration
@@ -105,17 +108,24 @@ final class AppModel {
                     Task { @MainActor in self.apply(progress) }
                 }
                 guard generation == scanGeneration else { return }
-                update(result: scanned)
-                selection = scanned.suggestedSelection
-                scanState = .finished
+                if review.finishScan(with: scanned) {
+                    scanState = .finished
+                } else {
+                    scanState = .failed("Your photo library changed during the scan. Scan again.")
+                }
             } catch is CancellationError {
-                if generation == scanGeneration { scanState = .idle }
+                if generation == scanGeneration {
+                    review.abortScan()
+                    scanState = .idle
+                }
             } catch ScanError.analysisUnavailable {
                 if generation == scanGeneration {
+                    review.abortScan()
                     scanState = .failed("This device could not analyse the photos. Nothing was changed.")
                 }
             } catch {
                 if generation == scanGeneration {
+                    review.abortScan()
                     scanState = .failed("The scan stopped: \(error.localizedDescription)")
                 }
             }
@@ -130,35 +140,34 @@ final class AppModel {
         if isScanning { scanState = .scanning(progress) }
     }
 
-    /// Single place where results change, so the selection can never hold an id that is not shown.
-    private func update(result newResult: ScanResult?) {
-        result = newResult
-        selection.formIntersection(newResult?.allIDs ?? [])
-    }
-
     private func libraryChanged(_ change: LibraryChange) {
         switch change {
         case let .assets(ids):
-            update(result: result?.removing(ids: ids))
+            review.libraryChanged(ids: ids)
         case .everything:
-            if !isScanning {
-                update(result: nil)
-                scanState = .idle
-            }
+            review.libraryChangedEverywhere()
+            if !isScanning { scanState = .idle }
         }
     }
 
     func toggle(_ id: String) {
-        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        review.toggle(id)
+    }
+
+    func select(ids: Set<String>) {
+        review.select(ids)
+    }
+
+    func deselect(ids: Set<String>) {
+        review.deselect(ids)
     }
 
     func selectedIDs(in category: CleanupCategory) -> Set<String> {
-        guard let result else { return [] }
-        return Set(result.items(in: category).map(\.id)).intersection(selection)
+        review.selectedIDs(in: category)
     }
 
     func delete(ids requested: Set<String>) async {
-        guard !requested.isEmpty, let before = result else { return }
+        guard !requested.isEmpty, let before = review.result else { return }
         deletionError = nil
         let deleted: Set<String>
         do {
@@ -171,7 +180,7 @@ final class AppModel {
         }
         let bytes = before.byteSize(of: deleted)
         // Ids that were already gone from the library leave the results as well.
-        update(result: result?.removing(ids: requested))
+        review.remove(ids: requested)
         await cache.remove(ids: Array(requested))
         await cache.save()
         if !deleted.isEmpty { lastDeletion = DeletionSummary(count: deleted.count, bytes: bytes) }
@@ -179,11 +188,11 @@ final class AppModel {
 
     /// The best photo of a group stays in the library anyway, so it cannot be "kept" away.
     func keep(ids: Set<String>) async {
-        guard let current = result else { return }
+        guard let current = review.result else { return }
         let keepable = ids.subtracting(current.keeperIDs)
         guard !keepable.isEmpty else { return }
         await keepList.add(Array(keepable))
-        update(result: result?.removing(ids: keepable))
+        review.remove(ids: keepable)
     }
 
     func dismissDeletionSummary() {
@@ -203,8 +212,7 @@ final class AppModel {
         scanTask = nil
         await cache.erase()
         await keepList.erase()
-        update(result: nil)
-        selection = []
+        review.clear()
         scanState = .idle
         UIApplication.shared.isIdleTimerDisabled = false
         isErasing = false
