@@ -1,6 +1,6 @@
-# Photo Cleanup (working title)
+# Stilltrim
 
-iPhone app that finds junk in the photo library (screenshots, duplicates, bad shots, big videos) and lets the user delete it in a few taps. All analysis runs on the device.
+Portfolio project. iPhone app that finds junk in the photo library (screenshots, duplicates, bad shots, big videos) and lets the user delete it in a few taps. All analysis runs on the device.
 
 ## Promise
 
@@ -8,15 +8,17 @@ Your photos never leave this phone. No server, no account, no analytics, no cras
 
 The app keeps a small cache on the device so rescans are fast. An "Erase app data" button wipes it, and the cache is excluded from device backups. The in-app wording says "never leaves this phone", not "nothing is stored", because the cache exists.
 
-`scripts/check-no-network.sh` guards the promise. It is a tripwire against accidents and lazy additions, not a proof against code written to evade it. It fails on network APIs, web views, third-party or binary dependencies, embedded frameworks, `contentsOf` outside the storage file, an `isNetworkAccessAllowed` that is not `false`, URLs opened outside the Settings page, ATS exceptions, tracking or push settings, a privacy manifest that declares tracking or collected data, and built binaries that link networking or web frameworks. It runs inside `scripts/verify.sh` and was checked against planted violations. The final check happens on a device: airplane mode, and the iOS App Privacy Report.
+`scripts/check-no-network.sh` guards the promise. It is a tripwire against accidents and lazy additions, not a proof against code written to evade it. It fails on network APIs, web views, third-party or binary dependencies, embedded frameworks, `contentsOf` outside the storage file, an `isNetworkAccessAllowed` that is not `false`, URLs opened outside the Settings page, ATS exceptions, tracking or push settings, a privacy manifest that declares tracking or collected data, and built binaries that link networking or web frameworks. It runs inside `scripts/verify.sh` and was checked against planted violations. A post-build step in the Xcode project (`scripts/check-built-app.sh`) checks the finished app after every build, device builds included, and fails the build when it links a networking or web framework or embeds a framework. The final check happens on a device: airplane mode, and the iOS App Privacy Report.
 
 ## Decisions (29 Sep 2026)
 
 - Native: Swift 6, SwiftUI, PhotoKit, Vision. Cross-platform layers would need native modules for both frameworks.
 - iOS 17.0 minimum, iPhone only.
-- Business model undecided. No paywall in v1. When StoreKit arrives, the network check gets one explicit allowance for it.
+- Free, no paywall. If StoreKit ever arrives, the network check gets one explicit allowance for it.
+- It is a portfolio piece, not on the App Store for now. People install it by building it or from an unsigned IPA on GitHub Releases (`docs/research/distribution.md`).
 - Categories in v1: screenshots and screen recordings, similar shots, blurry/dark/accidental shots, big videos.
-- Placeholders: app name "Photo Cleanup", bundle id `com.example.photocleanup`, accent colour, app icon. Replace before signing for release.
+- Name Stilltrim, bundle id `com.matuskalis.stilltrim` (a free Apple ID cannot use it, so a clone sets its own in `Config/Local.xcconfig`).
+- Accent red, light #D12E1F and dark #FF5B47. The hex values are still placeholders until judged on a device. Icon: a contact sheet, a 3 by 3 grid of grey frames with one circled in red (`Design/AppIcon.svg`, rendered by `scripts/render-icon.sh`). Research: `docs/research/identity.md`.
 
 ## How it works
 
@@ -74,14 +76,16 @@ File size comes from `PHAssetResource` through the key-value keys `fileSize` and
 4. Done: space freed once Recently Deleted is emptied, with steps.
 5. Settings: privacy in plain words and how to verify it (airplane mode, iOS App Privacy Report), manage limited access, erase app data.
 
-Look: native iOS, SF, system materials, one accent colour. No emoji markers, no accent-bar cards.
+Look: native iOS, SF, system materials, one accent colour (red). The selection mark and the Delete button share it: red means "this goes". No emoji markers, no accent-bar cards.
 
 ## Structure
 
 - `Packages/CleanupCore`: image quality metrics, feature print distance, grouping, keeper choice, and the result model (`ScanResult`, with removal, promotion and selection rules). Takes `CGImage` and plain values, no PhotoKit, so `swift test` runs on the Mac.
 - `App`: PhotoKit behind one actor (`PhotoLibraryService`), scan pipeline, cache, SwiftUI screens.
-- `project.yml` for XcodeGen. The generated `.xcodeproj` is not committed.
-- `scripts`: `verify.sh`, `check-no-network.sh`, `fetch-fixtures.sh`, `seed-simulator.sh`, `seed-bulk.sh`.
+- `project.yml` for XcodeGen. The generated `.xcodeproj` is not committed. The `Stilltrim` scheme has no tests, so pressing Test with a phone selected cannot delete its photos. The UI tests live in `Stilltrim-UITests` and skip themselves anywhere but a simulator.
+- `Design`: the icon source. `Config`: bundle id and team, `Local.xcconfig` overrides and is not committed.
+- `scripts`: `verify.sh`, `check-no-network.sh`, `check-built-app.sh`, `fetch-fixtures.sh`, `seed-simulator.sh`, `seed-bulk.sh`, `render-icon.sh`.
+- `.github/workflows`: `release.yml` builds an unsigned IPA on a version tag; `ci.yml` runs the checks and stays idle while the repository is private (macOS minutes cost money then).
 
 ## Findings
 
@@ -101,8 +105,8 @@ The second checked those fixes and found 3 more: a photo promoted to best after 
 
 1. Look up sizes only for candidates (screenshots, videos, group members, flagged photos), not for every asset.
 2. Exact duplicates anywhere in the library (same pixel size and byte size, confirmed by feature print). Needs sizes for all photos, so it waits for step 1.
-3. Real-device pass on a large library: speed, iCloud behaviour, Vision similarity quality, and whether the app's own large batch delete reaches the change observer as a non-incremental change (that would clear the results after a successful delete, which is safe but should not happen). Needs an Apple ID signed in to Xcode.
-4. Business model, name, icon, accent colour.
+3. Real-device pass on a large library (Settings, About shows which similarity check is active): speed, iCloud behaviour, Vision similarity quality, and whether the app's own large batch delete reaches the change observer as a non-incremental change (that would clear the results after a successful delete, which is safe but should not happen). Needs an Apple ID signed in to Xcode.
+4. Later, decided but not built: exact duplicates anywhere, smarter screenshots (label only), aesthetics score as a tie-break behind `#available(iOS 18)`, user-album protection, a strictness control, quick scan first. Ranking and effort: `docs/research/features-and-pipeline.md`.
 
 ## Out of scope for v1
 

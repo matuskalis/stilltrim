@@ -13,14 +13,14 @@ Research by an Opus subagent, 29 Sep 2026. Decision: the app is called **Stilltr
 | Remo Duplicate Photos Remover | Remo Software | Free | "Developer does not collect any data" |
 | Clever Cleaner: AI CleanUp App | CleverFiles Inc. | Free daily limits, premium $6.99/wk or $39.99 lifetime | On-device |
 | Phone Cleaner・Clean Up Storage | Brain Craft Ltd | Free plus in-app purchases | n/a |
-| Swipe Photo Cleaner: SwipeWipe (copycat) | FlashSoft OU | Free plus in-app purchases | n/a |
+| Swipe Photo Cleaner: SwipeWipe | FlashSoft OU | Free plus in-app purchases | n/a |
 | Delete Photos: TinyRoll / Unroller | Above AS / Mohamed Makled | Free plus in-app purchases | n/a |
 | PhotoDedup, AiCleanerPro, "Local Photo Cleaner", "OfflineClean" | various | mostly subscription | "100% on-device, never leaves your phone" |
 
 Naming patterns:
 - "Photo Cleaner" is in almost every subtitle.
 - Saturated brand words (iTunes searches for "<word> photo cleaner"): cull (5 apps), sweep (4), prune (3), tidy (3), keep (2), roll (4), swipe (dozens).
-- "On-device, photos never leave your phone" is now a common claim. What this app can say that others cannot: no networking code at all, and the code is public.
+- "On-device, photos never leave your phone" is now a common claim. What this app can claim and let anyone verify in its public code: no networking code at all.
 - Words nobody in the category uses yet: still, quiet, hush (only on photo-vault apps), trim (only TrimSwipe).
 
 ## Candidates

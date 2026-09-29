@@ -1,4 +1,4 @@
-# Photo Cleanup
+# Stilltrim
 
 iPhone app that finds junk in the photo library (screenshots, similar shots, blurry and dark frames, big videos) and deletes what the user picks. All analysis runs on the device. `SPEC.md` holds the design and the measurements behind every number.
 
@@ -9,12 +9,15 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - Deleting goes only through `PHAssetChangeRequest.deleteAssets`, so iOS shows its own confirmation. Nothing is pre-selected except the non-best photos of a similar group, never favourites or edited photos.
 - Result and selection change only through `ReviewState` (CleanupCore), so the selection never holds an id that is not shown and a freshly promoted best photo starts unselected. Rules about removing, promoting and suggesting live in `ScanResult.swift` and `ReviewState.swift`, with tests.
 - Every threshold comes from a measurement. Change one together with `CalibrationTests`: `scripts/fetch-fixtures.sh`, then `CLEANUP_FIXTURES=$PWD/.fixtures swift test` inside `Packages/CleanupCore`.
+- Never press Test with a phone as the destination. The `Stilltrim` scheme has no tests; the UI tests are in `Stilltrim-UITests`, delete seeded photos, and skip themselves outside a simulator.
+- A post-build step (`scripts/check-built-app.sh`) fails any Xcode build whose app links a networking or web framework or embeds a framework. Keep it in `project.yml`.
 - No em dashes in in-app copy.
 
 ## Commands
 
 - `xcodegen generate` builds the Xcode project from `project.yml`. The `.xcodeproj` is not committed.
-- `scripts/verify.sh` runs package tests, the simulator build and the privacy guard, then prints READY or NOT-READY. `--ui` adds the UI tests.
+- `scripts/verify.sh` runs package tests, the simulator build and the privacy guard, then prints READY or NOT-READY. `--ui` adds the UI tests (scheme `Stilltrim-UITests`).
+- `scripts/render-icon.sh` renders `Design/AppIcon.svg` into the asset catalog. Releases: push a tag `v0.1.0` and `.github/workflows/release.yml` builds the unsigned IPA.
 - `cd Packages/CleanupCore && swift test` is the fastest loop for the pure logic.
 - `scripts/seed-simulator.sh <UDID>` fills a simulator library with near-duplicates, blurry and blank frames, screenshots and a 78 MB video. `scripts/seed-bulk.sh <UDID> 2000` adds a scale set.
 - Debug launch arguments: `-autoScan`, `-tinyFingerprints`, `-openCategory similar|screenshots|lowQuality|bigVideos`.
@@ -22,12 +25,13 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 ## Simulator traps (iOS 26.1)
 
 - `simctl privacy grant photos` is ignored (it writes auth_version 1, PhotoKit wants 2). Run `UITests/GrantPhotosAccess` once per simulator.
-- Vision feature prints in the simulator are near-identical for different photos. Use `-tinyFingerprints` there. Check real similarity on the Mac (`swift test`) and on a device.
+- Vision feature prints in the simulator are near-identical for different photos. Use `-tinyFingerprints` there; it only works in simulator builds, and Settings, About shows the active check. Check real similarity on the Mac (`swift test`) and on a device.
 - Debug builds run the pixel loops about 6 times slower than optimized ones. Time scans with `SWIFT_OPTIMIZATION_LEVEL=-O`.
 - Seeded screenshots carry EXIF UserComment "Screenshot" so Photos flags them. Screen recordings cannot be seeded.
+- The first UI test run right after `simctl erase` failed once in four (the photo permission ended up denied and the scan never started). Reset it with `xcrun simctl privacy <udid> reset photos com.matuskalis.stilltrim` and rerun. The helper says so when it sees the denied state.
 - `UITests/CleanupFlow` deletes the seeded screenshots. Reseed before running it again.
 - `UITests/ScanControl` (cancel, erase mid-scan) needs `scripts/seed-bulk.sh <UDID> 2000` and skips itself on a small library.
 
 ## Placeholders
 
-Decided 29 Sep 2026, not yet applied: name Stilltrim, bundle id `com.matuskalis.stilltrim`, red accent and contact-sheet icon. Research behind every decision: `docs/research/`. Until applied the code still says `com.example.photocleanup`, system blue and no icon.
+Applied 29 Sep 2026: name Stilltrim, bundle id `com.matuskalis.stilltrim`, red accent, contact-sheet icon. The accent hex values (#D12E1F light, #FF5B47 dark) stay placeholders until judged on a device. Research behind every decision: `docs/research/`.
