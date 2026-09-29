@@ -3,7 +3,7 @@ import XCTest
 /// Cancelling a scan, and erasing app data in the middle of one, must both end cleanly.
 /// Needs a library big enough for a scan to last a few seconds: run scripts/seed-bulk.sh first.
 /// Skipped when the scan finishes too quickly to interrupt.
-final class ScanControl: XCTestCase {
+final class ScanControl: SimulatorOnlyTestCase {
     @MainActor
     private func launchAndErase() -> XCUIApplication {
         let app = XCUIApplication()

@@ -1,5 +1,17 @@
 import XCTest
 
+/// Base class of every UI test. The tests delete photos and erase app data, so on a device they would
+/// touch the real library. They skip before the first tap anywhere but a simulator. A test that does
+/// not derive from this class is a mistake: derive from it.
+class SimulatorOnlyTestCase: XCTestCase {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("These tests delete photos and erase data. They run on the simulator only.")
+        #endif
+    }
+}
+
 extension XCTestCase {
     /// Accepts the photo access prompt when the app asks for it. `simctl privacy grant photos` is
     /// ignored by the iOS 26.1 simulator (it writes auth_version 1, PhotoKit wants 2).

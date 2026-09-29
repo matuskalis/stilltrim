@@ -17,14 +17,15 @@ final class ThumbnailLoader {
 
     init(library: PhotoLibraryService) {
         self.library = library
-        cache.countLimit = 600
+        // About 48 MB of decoded thumbnails at most, so a long review session cannot exhaust memory.
+        cache.totalCostLimit = 48 * 1024 * 1024
     }
 
     func image(for id: String, side: CGFloat) async -> CGImage? {
         let key = "\(id)@\(Int(side))" as NSString
         if let cached = cache.object(forKey: key) { return cached }
         guard case let .image(image) = await library.thumbnail(for: id, side: side, exact: false) else { return nil }
-        cache.setObject(image, forKey: key)
+        cache.setObject(image, forKey: key, cost: image.width * image.height * 4)
         return image
     }
 }
@@ -57,21 +58,29 @@ final class AppModel {
 
     init() {
         thumbnails = ThumbnailLoader(library: library)
+        #if DEBUG && targetEnvironment(simulator)
+        // The Simulator's Vision returns near-identical vectors for every photo. The stand-in is
+        // compiled in for the Simulator only, so a device can never measure with it.
+        fingerprinter = CommandLine.arguments.contains("-tinyFingerprints") ? TinyImageFingerprinter() : VisionFingerprinter()
+        #else
+        fingerprinter = VisionFingerprinter()
+        #endif
         #if DEBUG
         let arguments = CommandLine.arguments
-        // The Simulator's Vision returns near-identical vectors for every photo.
-        fingerprinter = arguments.contains("-tinyFingerprints") ? TinyImageFingerprinter() : VisionFingerprinter()
         if let index = arguments.firstIndex(of: "-openCategory"), index + 1 < arguments.count {
             debugOpenCategory = CleanupCategory(rawValue: arguments[index + 1])
         }
-        #else
-        fingerprinter = VisionFingerprinter()
         #endif
         Task {
             await library.onLibraryChange { [weak self] change in
                 Task { @MainActor in self?.libraryChanged(change) }
             }
         }
+    }
+
+    /// Shown in Settings, so it is always clear what the similarity check runs on.
+    var similarityMethod: String {
+        fingerprinter is VisionFingerprinter ? "Apple Vision" : "Simulator stand-in, not Vision"
     }
 
     var result: ScanResult? { review.result }

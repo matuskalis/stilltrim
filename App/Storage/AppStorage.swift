@@ -4,7 +4,7 @@ import Foundation
 /// Everything the app keeps lives in one folder in Application Support, excluded from backups.
 enum AppStorage {
     static func directory() -> URL {
-        var url = URL.applicationSupportDirectory.appending(path: "PhotoCleanup", directoryHint: .isDirectory)
+        var url = URL.applicationSupportDirectory.appending(path: "Stilltrim", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true

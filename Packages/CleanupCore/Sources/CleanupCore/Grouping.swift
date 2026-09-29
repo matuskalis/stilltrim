@@ -25,7 +25,7 @@ public struct GroupingItem: Sendable {
 }
 
 public struct SimilarityRules: Sendable, Equatable {
-    /// Measured on Vision revision 2: same-scene variants reach 0.44, different scenes start at 0.74.
+    /// Measured on Vision revision 2: same-scene variants reach 0.44, different scenes start at 0.72.
     public var maxDistance: Float = 0.45
     public var maxNeighbors = 30
     public var maxInterval: TimeInterval = 600

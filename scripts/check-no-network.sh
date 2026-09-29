@@ -81,19 +81,19 @@ else
   fail "privacy manifest declares tracking or collected data (tracking=$tracking domains=$domains collected=$collected)"
 fi
 
-# 7. If a build exists, its binaries must not link networking or web frameworks and must not embed any.
-DENY_LINK='Network\.framework|WebKit\.framework|SafariServices\.framework|AdSupport\.framework|AppTrackingTransparency\.framework|StoreKit\.framework|CloudKit\.framework|MessageUI\.framework'
+# 7. Built apps found on disk (this repo's build folder and Xcode's DerivedData, so device builds count).
 checked=0
-for binary in build/Build/Products/*/PhotoCleanup.app/PhotoCleanup build/Build/Products/*/PhotoCleanup.app/PhotoCleanup.debug.dylib; do
-  [ -f "$binary" ] || continue
-  checked=1
-  linked=$(otool -L "$binary" | grep -E "$DENY_LINK" || true)
-  if [ -n "$linked" ]; then fail "$binary links a denied framework:"; echo "$linked"; fi
+for app in build/Build/Products/*/Stilltrim.app "$HOME"/Library/Developer/Xcode/DerivedData/Stilltrim-*/Build/Products/*/Stilltrim.app; do
+  [ -d "$app" ] || continue
+  checked=$((checked + 1))
+  ./scripts/check-built-app.sh "$app" || failed=1
 done
-for bundle in build/Build/Products/*/PhotoCleanup.app; do
-  [ -d "$bundle" ] || continue
-  if [ -d "$bundle/Frameworks" ]; then fail "$bundle embeds frameworks: $(ls "$bundle/Frameworks" | tr '\n' ' ')"; fi
-done
-[ "$checked" = 1 ] && [ "$failed" = 0 ] && pass "built binaries link no networking or web framework and embed none"
+if [ "$checked" -eq 0 ]; then
+  echo "SKIP  no built app found to inspect"
+elif [ "$failed" = 0 ]; then
+  pass "$checked built app(s) link no networking or web framework and embed none"
+else
+  fail "a built app breaks the rules above"
+fi
 
 exit $failed

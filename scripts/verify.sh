@@ -16,7 +16,7 @@ if [ -z "${CLEANUP_FIXTURES:-}" ]; then echo "note: CalibrationTests skipped, ru
 
 step "Generate project and build for the simulator"
 xcodegen generate >/dev/null || failed=1
-build_log=$(xcodebuild -project PhotoCleanup.xcodeproj -scheme PhotoCleanup -destination "$DESTINATION" \
+build_log=$(xcodebuild -project Stilltrim.xcodeproj -scheme Stilltrim -destination "$DESTINATION" \
   -derivedDataPath build build 2>&1)
 echo "$build_log" | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" | grep -v "AppIntents" | sort -u
 echo "$build_log" | grep -q "BUILD SUCCEEDED" || failed=1
@@ -24,9 +24,17 @@ echo "$build_log" | grep -q "BUILD SUCCEEDED" || failed=1
 step "Privacy guard"
 ./scripts/check-no-network.sh || failed=1
 
+step "UI tests cannot run on a device"
+if grep -nE "class [A-Za-z0-9_]+: *XCTestCase" UITests/*.swift | grep -v "UITests/Support.swift"; then
+  echo "error: a UI test derives from XCTestCase directly. Derive from SimulatorOnlyTestCase, or it can delete photos on a phone."
+  failed=1
+else
+  echo "PASS  every UI test derives from SimulatorOnlyTestCase"
+fi
+
 if [ "${1:-}" = "--ui" ]; then
   step "UI tests"
-  xcodebuild -project PhotoCleanup.xcodeproj -scheme PhotoCleanup -destination "$DESTINATION" \
+  xcodebuild -project Stilltrim.xcodeproj -scheme Stilltrim-UITests -destination "$DESTINATION" \
     -derivedDataPath build test 2>&1 | grep -E "error:|Test Case.*(passed|failed)|TEST (SUCCEEDED|FAILED)" || failed=1
 fi
 

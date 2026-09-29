@@ -116,7 +116,7 @@ struct ReviewView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.red)
+        .tint(.accentColor)
         .controlSize(.large)
         .disabled(ids.isEmpty)
         .padding(.horizontal)

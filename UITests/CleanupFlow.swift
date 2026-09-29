@@ -2,7 +2,7 @@ import XCTest
 
 /// Needs the seeded simulator library (scripts/seed-simulator.sh). It deletes the three seeded
 /// screenshots, so reseed before running it again.
-final class CleanupFlow: XCTestCase {
+final class CleanupFlow: SimulatorOnlyTestCase {
     @MainActor
     func testDeleteScreenshotsThroughTheSystemPrompt() {
         let app = XCUIApplication()

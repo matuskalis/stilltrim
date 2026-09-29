@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#121212"/>
+  <!-- contact sheet: three strips of three frames -->
+  <g>
+    <rect x="146" y="228" width="220" height="165" fill="#4A4A4A"/>
+    <rect x="402" y="228" width="220" height="165" fill="#5A5A5A"/>
+    <rect x="658" y="228" width="220" height="165" fill="#404040"/>
+    <rect x="146" y="429" width="220" height="165" fill="#525252"/>
+    <rect x="402" y="429" width="220" height="165" fill="#9C9C9C"/>
+    <rect x="658" y="429" width="220" height="165" fill="#464646"/>
+    <rect x="146" y="630" width="220" height="165" fill="#3C3C3C"/>
+    <rect x="402" y="630" width="220" height="165" fill="#4E4E4E"/>
+    <rect x="658" y="630" width="220" height="165" fill="#585858"/>
+  </g>
+  <!-- grease-pencil loop around the middle frame, ends overlapping like a hand mark -->
+  <path d="M 612 402 C 668 424 676 560 610 608 C 548 652 420 642 380 596 C 336 546 350 440 410 410 C 470 380 590 392 650 430"
+        fill="none" stroke="#FF5B47" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

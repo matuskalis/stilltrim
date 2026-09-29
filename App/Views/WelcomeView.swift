@@ -12,7 +12,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 28) {
             Spacer()
             VStack(alignment: .leading, spacing: 12) {
-                Text("Photo Cleanup")
+                Text("Stilltrim")
                     .font(.largeTitle.bold())
                 Text("Finds screenshots, duplicates and bad shots, and lets you delete them in a few taps.")
                     .font(.title3)

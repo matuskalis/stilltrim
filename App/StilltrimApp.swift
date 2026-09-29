@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PhotoCleanupApp: App {
+struct StilltrimApp: App {
     @State private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
 

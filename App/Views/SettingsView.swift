@@ -9,7 +9,7 @@ struct DeletionSummaryView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("\(summary.count.formatted()) deleted")
                 .font(.title.bold())
-            Text("They moved to Recently Deleted. The \(summary.bytes.formatted(.byteCount(style: .file))) comes back once you empty it.")
+            Text("They moved to Recently Deleted. The \(summary.bytes.formatted(.byteCount(style: .file))) comes back once you empty it. If you use iCloud Photos, they leave your other devices too.")
             VStack(alignment: .leading, spacing: 8) {
                 Text("To empty it")
                     .font(.headline)
@@ -44,7 +44,10 @@ struct SettingsView: View {
     }
 
     private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let info = Bundle.main
+        let short = info.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = info.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "\(short) (\(build))"
     }
 
     var body: some View {
@@ -71,6 +74,7 @@ struct SettingsView: View {
                 }
                 Section("About") {
                     LabeledContent("Version", value: version)
+                    LabeledContent("Similarity check", value: model.similarityMethod)
                 }
             }
             .navigationTitle("Settings")

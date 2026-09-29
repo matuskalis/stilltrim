@@ -32,7 +32,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationTitle("Photo Cleanup")
+            .navigationTitle("Stilltrim")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape") { showSettings = true }
