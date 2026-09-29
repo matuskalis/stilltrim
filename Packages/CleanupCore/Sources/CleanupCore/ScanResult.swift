@@ -42,6 +42,8 @@ public struct SimilarGroup: Identifiable, Sendable, Hashable {
         self.rankedIDs = rankedIDs
     }
 
+    public var keeperID: String? { items.first(where: \.isKeeper)?.id }
+
     public var removableCount: Int { items.filter { !$0.isKeeper }.count }
 
     public var reclaimableBytes: Int64 {
