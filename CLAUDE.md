@@ -7,7 +7,7 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - Nothing leaves the phone. No networking code, no third-party code, no analytics. `scripts/check-no-network.sh` is a tripwire for it (not a proof) and runs inside `scripts/verify.sh`. The real check is a device in airplane mode plus the iOS App Privacy Report. When StoreKit joins for a paywall, allow it in that script on purpose and nowhere else.
 - `isNetworkAccessAllowed` is always false. The app never downloads from iCloud.
 - Deleting goes only through `PHAssetChangeRequest.deleteAssets`, so iOS shows its own confirmation. Nothing is pre-selected except the non-best photos of a similar group, never favourites or edited photos.
-- Results change only through `AppModel.update(result:)`, which prunes the selection, so the selection never holds an id that is not shown. Rules about removing, promoting and suggesting live in `CleanupCore/ScanResult.swift` with tests.
+- Result and selection change only through `ReviewState` (CleanupCore), so the selection never holds an id that is not shown and a freshly promoted best photo starts unselected. Rules about removing, promoting and suggesting live in `ScanResult.swift` and `ReviewState.swift`, with tests.
 - Every threshold comes from a measurement. Change one together with `CalibrationTests`: `scripts/fetch-fixtures.sh`, then `CLEANUP_FIXTURES=$PWD/.fixtures swift test` inside `Packages/CleanupCore`.
 - No em dashes in in-app copy.
 
@@ -26,6 +26,7 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - Debug builds run the pixel loops about 6 times slower than optimized ones. Time scans with `SWIFT_OPTIMIZATION_LEVEL=-O`.
 - Seeded screenshots carry EXIF UserComment "Screenshot" so Photos flags them. Screen recordings cannot be seeded.
 - `UITests/CleanupFlow` deletes the seeded screenshots. Reseed before running it again.
+- `UITests/ScanControl` (cancel, erase mid-scan) needs `scripts/seed-bulk.sh <UDID> 2000` and skips itself on a small library.
 
 ## Placeholders
 

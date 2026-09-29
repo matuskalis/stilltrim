@@ -52,9 +52,11 @@ Deletion goes through `PHAssetChangeRequest.deleteAssets`. iOS shows its own con
 
 "Keep" on an item adds it to an on-device keep list and it never shows again. The best photo of a group is kept anyway, so it has no "Keep" action.
 
-Results follow the library. A `PHPhotoLibraryChangeObserver` drops every scanned asset that was removed or changed since the scan (a favourite added in the Photos app, an edit, a deletion), so a stale suggestion cannot be acted on. When PhotoKit cannot describe a change, the results are cleared and a rescan is needed. The selection can only hold ids that are shown: every change to the results goes through one function that prunes it.
+Results follow the library. A `PHPhotoLibraryChangeObserver` drops every scanned asset that was removed or changed since the scan (a favourite added in the Photos app, an edit, a deletion), so a stale suggestion cannot be acted on. Changes that arrive while a scan runs are held back and applied when it finishes, so a photo favourited mid-scan is not pre-selected. When PhotoKit cannot describe a change, the results are cleared and a rescan is needed (mid-scan, the finished scan is discarded).
 
-When the best photo of a group is deleted, the best of the rest takes its place and is no longer suggested for removal, so a group never ends up with every copy suggested. A group with fewer than two photos left disappears.
+`ReviewState` in CleanupCore owns the result and the selection, so the two cannot drift apart: the selection only holds ids that are shown, and a photo that just became the best of its group starts unselected (a deletion elsewhere in the group promotes it). Picking a best photo by hand stays possible. A group with fewer than two photos left disappears. When the best photo of a group is deleted, the best of the rest takes its place and is no longer suggested for removal, so a group never ends up with every copy suggested.
+
+A thumbnail request ends when the scan is cancelled or after 30 seconds, and a degraded preview of an iCloud photo counts as "not on this phone", so a scan can always be stopped and erasing app data cannot hang.
 
 ### Cache
 
@@ -91,13 +93,15 @@ Look: native iOS, SF, system materials, one accent colour. No emoji markers, no 
 
 ## Review
 
-An independent Opus review of the first version found 8 issues, all fixed with tests where the logic is pure: a single broken photo made every rescan fail, results went stale when the library changed, "Deselect all" left hand-picked photos selected, the privacy guard could be sidestepped in three ways, the cache was rewritten after every non-analysed photo, erasing data did not wait for a running scan, keeping or deleting the best photo dropped its whole group, and the result rules had no tests.
+Two independent Opus reviews. The first found 8 issues: a single broken photo made every rescan fail, results went stale when the library changed, "Deselect all" left hand-picked photos selected, the privacy guard could be sidestepped in three ways, the cache was rewritten after every non-analysed photo, erasing data did not wait for a running scan, keeping or deleting the best photo dropped its whole group, and the result rules had no tests.
+
+The second checked those fixes and found 3 more: a photo promoted to best after a deletion stayed selected (one tap on Delete could remove a whole burst), library changes during a scan were lost, and a thumbnail request could not be cancelled or time out. All fixed. The first is covered by `ReviewStateTests`, the other two by `ScanControl` UI tests on a 2,000 photo library (cancel, and erase in the middle of a scan).
 
 ## Next
 
 1. Look up sizes only for candidates (screenshots, videos, group members, flagged photos), not for every asset.
 2. Exact duplicates anywhere in the library (same pixel size and byte size, confirmed by feature print). Needs sizes for all photos, so it waits for step 1.
-3. Real-device pass on a large library: speed, iCloud behaviour, Vision similarity quality. Needs an Apple ID signed in to Xcode.
+3. Real-device pass on a large library: speed, iCloud behaviour, Vision similarity quality, and whether the app's own large batch delete reaches the change observer as a non-incremental change (that would clear the results after a successful delete, which is safe but should not happen). Needs an Apple ID signed in to Xcode.
 4. Business model, name, icon, accent colour.
 
 ## Out of scope for v1
