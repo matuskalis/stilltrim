@@ -30,4 +30,4 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 
 ## Placeholders
 
-App name, bundle id `com.example.photocleanup`, accent colour and app icon. Replace before release.
+Decided 29 Sep 2026, not yet applied: name Stilltrim, bundle id `com.matuskalis.stilltrim`, red accent and contact-sheet icon. Research behind every decision: `docs/research/`. Until applied the code still says `com.example.photocleanup`, system blue and no icon.

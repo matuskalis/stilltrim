@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#1C1D1F"/>
+  <!-- the still: a print, 4:3 -->
+  <rect x="272" y="332" width="480" height="360" fill="#EDEDED"/>
+  <!-- trim marks: extensions of each edge, stopped short of the corner -->
+  <g fill="#EDEDED">
+    <!-- top left -->
+    <rect x="124" y="312" width="100" height="40"/>
+    <rect x="252" y="184" width="40" height="100"/>
+    <!-- top right -->
+    <rect x="800" y="312" width="100" height="40"/>
+    <rect x="732" y="184" width="40" height="100"/>
+    <!-- bottom left -->
+    <rect x="124" y="672" width="100" height="40"/>
+    <rect x="252" y="740" width="40" height="100"/>
+    <!-- bottom right -->
+    <rect x="800" y="672" width="100" height="40"/>
+    <rect x="732" y="740" width="40" height="100"/>
+  </g>
+</svg>
