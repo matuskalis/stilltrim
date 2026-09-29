@@ -63,4 +63,8 @@ Continuous integration runs on GitHub once the repository is public: unit tests 
 
 Open an issue: https://github.com/matuskalis/stilltrim/issues
 
-`SPEC.md` has the design and every measured threshold. `PROJECT.md` has the overview and decisions. `CLAUDE.md` has the rules for coding sessions.
+`SPEC.md` has the design and every measured threshold. `CLAUDE.md` has the rules for coding sessions. `docs/research/` has the research behind the name, the icon and how to distribute the app.
+
+## Licence
+
+MIT, see `LICENSE`. The code is free to use, change and share, including commercially, as long as the copyright notice stays with it. The name Stilltrim and the icon are not part of that grant: a fork needs its own name and icon.
