@@ -71,10 +71,8 @@ final class AppModel {
             debugOpenCategory = CleanupCategory(rawValue: arguments[index + 1])
         }
         #endif
-        Task {
-            await library.onLibraryChange { [weak self] change in
-                Task { @MainActor in self?.libraryChanged(change) }
-            }
+        library.onLibraryChange { [weak self] change in
+            Task { @MainActor in self?.libraryChanged(change) }
         }
     }
 

@@ -24,6 +24,8 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 
 ## Simulator traps (iOS 26.1)
 
+- After an Xcode update every developer tool (`git` included, it is Xcode's shim) stops until the licence is accepted (`sudo xcodebuild -license accept`), and `xcodebuild` and `simctl` then fail to load a plug-in until `sudo xcodebuild -runFirstLaunch` has run. Both need the owner's password, so ask, do not work around them. `xcodebuild -checkFirstLaunchStatus` exits 0 once done.
+
 - `simctl privacy grant photos` is ignored (it writes auth_version 1, PhotoKit wants 2). Run `UITests/GrantPhotosAccess` once per simulator.
 - Vision feature prints in the simulator are near-identical for different photos. Use `-tinyFingerprints` there; it only works in simulator builds, and Settings, About shows the active check. Check real similarity on the Mac (`swift test`) and on a device.
 - Debug builds run the pixel loops about 6 times slower than optimized ones. Time scans with `SWIFT_OPTIMIZATION_LEVEL=-O`.

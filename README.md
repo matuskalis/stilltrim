@@ -26,7 +26,7 @@ Your photos never leave the phone. A small cache of numbers per photo (no pictur
 
 ### Build it yourself (most reliable)
 
-You need a Mac with Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), and an iPhone on iOS 17 or later. A free Apple ID is enough.
+You need a Mac with Xcode 26 or 27 (built and tested with 26.1.1, 26.6 and 27.0), [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), and an iPhone on iOS 17 or later. A free Apple ID is enough.
 
 1. In Xcode, Settings, Accounts: add your Apple ID. That creates your personal team.
 2. Connect the iPhone with a cable and trust the Mac. Turn on Developer Mode on the phone (Settings, Privacy & Security, Developer Mode, then restart). The switch only appears after the phone has been connected to Xcode once.

@@ -43,7 +43,8 @@ actor PhotoLibraryService {
         PHPhotoLibrary.shared().unregisterChangeObserver(changeObserver)
     }
 
-    func onLibraryChange(_ handler: @escaping @Sendable (LibraryChange) -> Void) {
+    /// The observer keeps its handler behind a lock, so setting it needs no actor hop.
+    nonisolated func onLibraryChange(_ handler: @escaping @Sendable (LibraryChange) -> Void) {
         changeObserver.setHandler(handler)
     }
 
