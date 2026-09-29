@@ -5,8 +5,8 @@ name: Release
 #
 # Two jobs on purpose. The build job runs a downloaded tool (XcodeGen) and only has a read-only token.
 # The publish job has the write token and runs nothing but the release command.
-# Not yet run on a hosted runner: the build commands were checked locally, the runner label and the
-# Xcode path below were not.
+# The build commands were checked locally. This workflow itself has not run yet. ci.yml shows that the
+# runner label, the Xcode path and the XcodeGen download work on the hosted runner.
 on:
   push:
     tags: ['v*']
@@ -51,7 +51,7 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
 
       - name: Install XcodeGen
         run: |

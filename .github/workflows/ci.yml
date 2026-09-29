@@ -1,7 +1,7 @@
 name: CI
 
-# Not yet run on a hosted runner: the commands were checked locally, the runner label and the Xcode
-# path were not.
+# Runs on macos-26 with Xcode 26.6, the image's default. Xcode 26.1.1 is on that image without an
+# iOS simulator runtime, so it cannot build for a simulator there.
 on:
   push:
     branches: [main]
@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
 
       - name: Install XcodeGen
         run: |
