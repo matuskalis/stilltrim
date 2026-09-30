@@ -7,15 +7,18 @@ struct DeletionSummaryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("\(summary.count.formatted()) deleted")
+            Text("\(summary.count.formatted()) \(summary.count == 1 ? "item" : "items") deleted")
                 .font(.title.bold())
-            Text("They moved to Recently Deleted. The \(summary.bytes.formatted(.byteCount(style: .file))) comes back once you empty it. If you use iCloud Photos, they leave your other devices too.")
+                .accessibilityIdentifier("deletion-title")
+            Text("Deleted items stay in Recently Deleted for 30 days. You can recover them there.")
+            if summary.bytes > 0 {
+                Text("The \(summary.bytes.formatted(.byteCount(style: .file))) comes back when you empty Recently Deleted.")
+            }
+            Text("With iCloud Photos on, deleted items also leave your other devices.")
             VStack(alignment: .leading, spacing: 8) {
-                Text("To empty it")
+                Text("To empty Recently Deleted")
                     .font(.headline)
-                Text("1. Open Photos, then Albums.")
-                Text("2. Scroll down to Recently Deleted.")
-                Text("3. Tap Select, then Delete All.")
+                Text("Open Photos. Recently Deleted is under Utilities. Unlock it, tap Select, then delete the items.")
             }
             Spacer()
             Button("Done") { model.dismissDeletionSummary() }
@@ -25,7 +28,7 @@ struct DeletionSummaryView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -54,23 +57,36 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Privacy") {
-                    Text("Your photos never leave this phone. This app has no account, no server, no analytics and no ads, and it contains no networking code.")
+                    Text("Stilltrim sends nothing off this phone. It has no account, no server, no analytics, no ads and no networking code.")
+                    Text("To scan faster next time, it keeps a small record per photo on this phone. The record holds numbers and labels only: file size, whether the photo is edited, quality scores, a similarity fingerprint and, for screenshots, the kind. It holds no pictures and no text, and it is left out of backups.")
+                    Text("To sort screenshots, it reads their text on this phone and keeps only the kind, such as Receipts.")
                     DisclosureGroup("Check it yourself") {
-                        Text("Turn on airplane mode and scan: everything still works. Or open the iOS Settings app, then Privacy & Security, then App Privacy Report: this app shows no network activity.")
-                            .font(.subheadline)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("1. Open iOS Settings, then Privacy & Security, then App Privacy Report. Turn it on.")
+                            Text("2. Come back and scan.")
+                            Text("3. Open App Privacy Report again. Under App Network Activity, Stilltrim is not listed. Under Data & Sensor Access it lists Photos, as expected.")
+                            Text("Or scan in airplane mode. The scan still works.")
+                        }
+                        .font(.subheadline)
                     }
                 }
-                Section("Photo access") {
+                Section {
                     LabeledContent("Access", value: accessText)
                     if model.access.status == .limited {
                         Button("Choose more photos") { model.access.presentLimitedPicker() }
                     }
                     Button("Open iOS Settings") { model.access.openSystemSettings() }
+                } header: {
+                    Text("Photo access")
+                } footer: {
+                    if model.access.status == .limited {
+                        Text("Stilltrim scans only the photos you chose.")
+                    }
                 }
                 Section {
                     Button("Erase app data", role: .destructive) { confirmErase = true }
                 } footer: {
-                    Text("Removes the scan cache and the list of photos you chose to keep. Your photos are not touched.")
+                    Text("Removes the scan cache and the list of photos you chose to keep. Your photos are not touched. Photos you kept can show up in the lists again.")
                 }
                 Section("About") {
                     LabeledContent("Version", value: version)

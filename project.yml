@@ -24,7 +24,7 @@ targets:
         CFBundleDisplayName: Stilltrim
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSPhotoLibraryUsageDescription: Stilltrim scans your photos on this phone to find screenshots, duplicates and bad shots. It deletes only what you choose. Nothing leaves your phone.
+        NSPhotoLibraryUsageDescription: The app checks your photos on this phone to find screenshots, similar shots and blurry photos, and deletes only what you choose.
         PHPhotoLibraryPreventAutomaticLimitedAccessAlert: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:

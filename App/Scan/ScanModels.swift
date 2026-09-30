@@ -13,10 +13,10 @@ extension CleanupCategory {
 
     var explanation: String {
         switch self {
-        case .screenshots: "Screenshots and screen recordings"
-        case .similar: "Duplicates and near-duplicates"
-        case .lowQuality: "Blurry, dark, blank and overexposed shots"
-        case .bigVideos: "Videos over 50 MB"
+        case .screenshots: "Screenshots and screen recordings, sorted by kind"
+        case .similar: "Photos that look alike and were taken minutes apart. One is marked Best."
+        case .lowQuality: "Blurry, dark, blank or too bright photos"
+        case .bigVideos: "Videos of 50 MB or more"
         }
     }
 

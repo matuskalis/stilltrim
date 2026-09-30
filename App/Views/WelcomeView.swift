@@ -4,9 +4,6 @@ import SwiftUI
 struct WelcomeView: View {
     @Environment(AppModel.self) private var model
 
-    private var accessRefused: Bool {
-        model.access.status == .denied || model.access.status == .restricted
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -14,26 +11,34 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Stilltrim")
                     .font(.largeTitle.bold())
-                Text("Finds screenshots, duplicates and bad shots, and lets you delete them in a few taps.")
+                Text("Finds screenshots, similar shots, blurry photos and big videos. You choose what to delete.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 16) {
-                PromiseRow(symbol: "iphone", text: "Every photo is checked on this phone.")
-                PromiseRow(symbol: "icloud.slash", text: "Nothing is uploaded. No account, no analytics, no ads.")
-                PromiseRow(symbol: "hand.tap", text: "Nothing is deleted until you confirm.")
+                PromiseRow(symbol: "iphone", text: "Stilltrim checks photos on this phone only.")
+                PromiseRow(symbol: "icloud.slash", text: "Stilltrim uploads nothing. No account, no analytics, no ads.")
+                PromiseRow(symbol: "hand.tap", text: "Stilltrim deletes only what you select and confirm. Deleted photos stay in Recently Deleted for 30 days.")
             }
             Spacer()
-            if accessRefused {
-                Text("Photo access is off. Turn it on in Settings to scan your library.")
+            switch model.access.status {
+            case .denied:
+                Text("Photo access is off. Turn it on in iOS Settings to scan.")
                     .foregroundStyle(.secondary)
-                Button("Open Settings") { model.access.openSystemSettings() }
+                Button("Open iOS Settings") { model.access.openSystemSettings() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-            } else {
-                Button("Allow photo access") { Task { await model.access.request() } }
+                    .accessibilityIdentifier("open-ios-settings")
+            case .restricted:
+                Text("Photo access is restricted on this phone, for example by Screen Time. Stilltrim cannot scan until that changes.")
+                    .foregroundStyle(.secondary)
+            default:
+                Text("Next, iOS asks how much of your library Stilltrim may see.")
+                    .foregroundStyle(.secondary)
+                Button("Continue") { Task { await model.access.request() } }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .accessibilityIdentifier("request-photo-access")
             }
         }
         .padding(24)
