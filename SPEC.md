@@ -1,12 +1,12 @@
 # Stilltrim
 
-Portfolio project. iPhone app that finds junk in the photo library (screenshots, duplicates, bad shots, big videos) and lets the user delete it in a few taps. All analysis runs on the device.
+Portfolio project. iPhone app that finds junk in the photo library (screenshots, similar shots, blurry photos, big videos) and lets the user delete it. All analysis runs on the device.
 
 ## Promise
 
-Your photos never leave this phone. No server, no account, no analytics, no crash reporter, no third-party SDK, no network code.
+Stilltrim sends nothing off this phone. No server, no account, no analytics, no crash reporter, no third-party SDK, no network code.
 
-The app keeps a small cache on the device so rescans are fast. An "Erase app data" button wipes it, and the cache is excluded from device backups. The in-app wording says "never leaves this phone", not "nothing is stored", because the cache exists.
+The app keeps a small cache on the device so rescans are fast. An "Erase app data" button wipes it, and the cache is excluded from device backups. The in-app wording says "sends nothing off this phone", not "nothing is stored", because the cache exists.
 
 `scripts/check-no-network.sh` guards the promise. It is a tripwire against accidents and lazy additions, not a proof against code written to evade it. It fails on network APIs, OS calls that make the system fetch data for the app (asset requests, the cloud language model, resource upload jobs, downloadable Vision assets), web views, third-party or binary dependencies, embedded frameworks, `contentsOf` outside the storage file, an `isNetworkAccessAllowed` that is not `false`, URLs opened outside the Settings page, ATS exceptions, tracking or push settings, a privacy manifest that declares tracking or collected data, and built binaries that link networking or web frameworks. It runs inside `scripts/verify.sh` and was checked against planted violations. A post-build step in the Xcode project (`scripts/check-built-app.sh`) checks the finished app after every build, device builds included, and fails the build when it links a networking or web framework or embeds a framework. The final check happens on a device: airplane mode, and the iOS App Privacy Report.
 

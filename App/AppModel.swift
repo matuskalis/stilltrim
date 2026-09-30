@@ -118,7 +118,7 @@ final class AppModel {
                 if review.finishScan(with: scanned) {
                     scanState = .finished
                 } else {
-                    scanState = .failed("Your photo library changed during the scan. Scan again.")
+                    scanState = .failed("Your library changed during the scan, so the results were dropped. Scan again.")
                 }
             } catch is CancellationError {
                 if generation == scanGeneration {
@@ -128,12 +128,12 @@ final class AppModel {
             } catch ScanError.analysisUnavailable {
                 if generation == scanGeneration {
                     review.abortScan()
-                    scanState = .failed("This device could not analyse the photos. Nothing was changed.")
+                    scanState = .failed("Stilltrim could not check the photos on this phone. Nothing was changed.")
                 }
             } catch {
                 if generation == scanGeneration {
                     review.abortScan()
-                    scanState = .failed("The scan stopped: \(error.localizedDescription)")
+                    scanState = .failed("The scan stopped. Nothing was changed.\n\(Self.details(of: error))")
                 }
             }
         }
@@ -153,7 +153,9 @@ final class AppModel {
             review.libraryChanged(ids: ids)
         case .everything:
             review.libraryChangedEverywhere()
-            if !isScanning { scanState = .idle }
+            if !isScanning {
+                scanState = scanState == .finished ? .failed("Your library changed, so the results were cleared. Scan again.") : .idle
+            }
         }
     }
 
@@ -189,7 +191,7 @@ final class AppModel {
             deleted = try await library.delete(ids: requested)
         } catch {
             if (error as? PHPhotosError)?.code != .userCancelled {
-                deletionError = "The photos could not be deleted: \(error.localizedDescription)"
+                deletionError = Self.deletionMessage(for: error)
             }
             return
         }
@@ -208,6 +210,20 @@ final class AppModel {
         guard !keepable.isEmpty else { return }
         await keepList.add(Array(keepable))
         review.remove(ids: keepable)
+    }
+
+    private static func details(of error: Error) -> String {
+        let nsError = error as NSError
+        return "Details: \(nsError.domain) \(nsError.code)"
+    }
+
+    private static func deletionMessage(for error: Error) -> String {
+        switch (error as? PHPhotosError)?.code {
+        case .accessUserDenied, .accessRestricted:
+            "Photo access is off. Turn it on in iOS Settings, then try again."
+        default:
+            "Try again.\n\(details(of: error))"
+        }
     }
 
     func dismissDeletionSummary() {

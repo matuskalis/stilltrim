@@ -33,7 +33,9 @@ final class DeleteAbove: SimulatorOnlyTestCase {
         button.tap()
         confirmSystemDeletion()
 
-        XCTAssertTrue(app.staticTexts["\(above) deleted"].waitForExistence(timeout: 120), "deleted a different number than the button said")
+        let title = app.staticTexts["deletion-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 120), "the deletion summary did not appear")
+        XCTAssertTrue(title.label.hasPrefix("\(above) "), "deleted a different number than the button said: \(title.label)")
         app.buttons["Done"].tap()
 
         // The list goes back to the photo the user was at. It may sit a little lower afterwards, never higher:

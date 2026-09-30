@@ -9,6 +9,12 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
+                if model.access.status == .limited {
+                    Section {
+                        Text("Stilltrim can see only the photos you chose, so results cover those photos only.")
+                        Button("Choose more photos") { model.access.presentLimitedPicker() }
+                    }
+                }
                 Section { summary }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
@@ -21,11 +27,12 @@ struct HomeView: View {
                         }
                     } footer: {
                         if result.notOnDevice > 0 {
-                            Text("\(result.notOnDevice.formatted()) photos are only in iCloud and were not checked. This app never downloads them.")
+                            let count = result.notOnDevice
+                            Text("\(count.formatted()) \(count == 1 ? "photo is" : "photos are") only in iCloud, so \(count == 1 ? "it was" : "they were") not checked.\nStilltrim never downloads photos.")
                         }
                     }
                 } else if case .idle = model.scanState {
-                    Section("What gets checked") {
+                    Section("What Stilltrim looks for") {
                         ForEach(CleanupCategory.allCases) { category in
                             Label(category.explanation, systemImage: category.symbol)
                         }
@@ -60,7 +67,7 @@ struct HomeView: View {
             case .idle:
                 Text("Ready to scan")
                     .font(.title2.bold())
-                Text("Your photos stay on this phone.")
+                Text("Scanning deletes nothing. Stilltrim sends nothing off this phone.")
                     .foregroundStyle(.secondary)
                 Button("Scan photos") { model.startScan() }
                     .buttonStyle(.borderedProminent)
@@ -78,12 +85,13 @@ struct HomeView: View {
                     .padding(.top, 4)
             case .finished:
                 let total = model.result?.totalReclaimableBytes ?? 0
-                Text(total.formatted(.byteCount(style: .file)))
+                Text(total == 0 ? "Nothing to review" : total.formatted(.byteCount(style: .file)))
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                     .contentTransition(.numericText())
-                Text(total == 0 ? "Nothing to clean up" : "can be cleaned")
+                Text(total == 0 ? "Stilltrim found no screenshots, similar shots, blurry photos or big videos." : "can be cleaned")
+                    .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                 Button("Scan again") { model.startScan() }
                     .padding(.top, 4)
@@ -116,25 +124,26 @@ private struct CategoryRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(result.reclaimableBytes(in: category).formatted(.byteCount(style: .file)))
-                .foregroundStyle(.secondary)
+            if bytes > 0 {
+                Text(bytes.formatted(.byteCount(style: .file)))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
 
+    private var bytes: Int64 { result.reclaimableBytes(in: category) }
+
     private var detail: String {
         let count = result.removableCount(in: category)
+        if count == 0 { return "Nothing found" }
+        let number = count.formatted()
+        let isOne = count == 1
         switch category {
-        case .similar:
-            return "\(plural(count, "photo")) in \(plural(result.similarGroups.count, "group"))"
-        case .bigVideos:
-            return plural(count, "video")
-        default:
-            return plural(count, "item")
+        case .similar: return "\(number) extra \(isOne ? "photo" : "photos")"
+        case .bigVideos: return "\(number) \(isOne ? "video" : "videos")"
+        case .lowQuality: return "\(number) \(isOne ? "photo" : "photos")"
+        case .screenshots: return isOne ? "1 screenshot or recording" : "\(number) screenshots and recordings"
         }
-    }
-
-    private func plural(_ count: Int, _ noun: String) -> String {
-        "\(count.formatted()) \(noun)\(count == 1 ? "" : "s")"
     }
 }

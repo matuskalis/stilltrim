@@ -33,7 +33,7 @@ extension XCTestCase {
     /// The first launch on a freshly erased simulator is slow, so this waits for the app to settle.
     @MainActor
     func grantPhotoAccessIfAsked(_ app: XCUIApplication) {
-        let ask = app.buttons["Allow photo access"]
+        let ask = app.buttons["request-photo-access"]
         // A warm cache lets an -autoScan launch finish and open a category before the first look.
         let reviewBar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete ' OR label == 'Select items to delete'")).firstMatch
         let alreadyPastWelcome = [app.buttons["Scan photos"], app.staticTexts["Screenshots"], app.buttons["Cancel"], reviewBar]
@@ -41,7 +41,7 @@ extension XCTestCase {
         while Date() < deadline {
             if ask.exists { break }
             if alreadyPastWelcome.contains(where: \.exists) { return }
-            if app.buttons["Open Settings"].exists {
+            if app.buttons["open-ios-settings"].exists {
                 XCTFail("Photo access was denied earlier. Reset it: xcrun simctl privacy <udid> reset photos <bundle id>")
                 return
             }

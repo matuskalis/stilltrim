@@ -13,14 +13,14 @@ Status: version 0.1, a portfolio project. It is not on the App Store. You build 
 - **Blurry and dark.** Very dark, overexposed, blank or blurry photos. Listed for review, never pre-selected.
 - **Big videos.** Videos of 50 MB or more, largest first.
 
-You tick what goes and tap Delete. iOS asks you to confirm, and the photos move to Recently Deleted. The space comes back when you empty it. In a long list, Delete N above removes only the ticked photos you have already scrolled past, so you can work through it in batches.
+You tick what goes and tap Delete. iOS asks you to confirm, and the photos move to Recently Deleted, where you can recover them for 30 days. The space comes back when you empty it. In a long list, Delete N above removes only the ticked photos you have already scrolled past, so you can work through it in batches.
 
 ## The promise, and how to check it
 
-Your photos never leave the phone. A small cache of numbers per photo (no pictures) stays on the phone, out of backups, and Settings, Erase app data wipes it.
+Stilltrim sends nothing off the phone. A small cache of numbers per photo (no pictures) stays on the phone, out of backups, and Settings, Erase app data wipes it.
 
 - The code has no networking. `scripts/check-no-network.sh` fails on networking, web views, third-party code and tracking settings, and a build step checks the finished app for linked networking frameworks after every build. It is a tripwire, not a proof.
-- Check it yourself on the phone: Settings, Privacy & Security, App Privacy Report, turn it on, run a scan, then open the report and look for Stilltrim under network activity. Or run a whole scan in airplane mode.
+- Check it yourself on the phone: Settings, Privacy & Security, App Privacy Report, turn it on, run a scan, then open the report and look for Stilltrim under App Network Activity. Or run a whole scan in airplane mode.
 
 ## Install
 

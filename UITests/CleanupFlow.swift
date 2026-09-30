@@ -30,6 +30,8 @@ final class CleanupFlow: SimulatorOnlyTestCase {
 
         confirmSystemDeletion()
 
-        XCTAssertTrue(app.staticTexts["3 deleted"].waitForExistence(timeout: 20))
+        let title = app.staticTexts["deletion-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 20))
+        XCTAssertTrue(title.label.hasPrefix("3 "), "deleted a different number than the three screenshots: \(title.label)")
     }
 }
