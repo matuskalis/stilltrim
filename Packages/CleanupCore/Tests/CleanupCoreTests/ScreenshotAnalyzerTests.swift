@@ -4,6 +4,7 @@ import CoreImage.CIFilterBuiltins
 import CoreText
 import Foundation
 import Testing
+import Vision
 @testable import CleanupCore
 
 /// Runs Vision on drawn screens, so it needs a real Mac (CI skips it, like the fingerprint tests).
@@ -36,6 +37,14 @@ import Testing
             context.draw(image, in: CGRect(x: 200, y: 900, width: 780, height: 780))
         }
         return context.makeImage()!
+    }
+
+    @Test func everyVisionRequestHasItsRevisionPinned() {
+        let requests = ScreenshotAnalyzer.makeRequests()
+        #expect(requests.text.revision == VNRecognizeTextRequestRevision3)
+        #expect(requests.scene.revision == VNClassifyImageRequestRevision2)
+        #expect(requests.barcodes.revision == VNDetectBarcodesRequestRevision4)
+        #expect(requests.text.recognitionLevel == .fast)
     }
 
     @Test func textPositionsAreMeasuredFromTheTop() throws {

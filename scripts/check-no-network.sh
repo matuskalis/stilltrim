@@ -29,8 +29,10 @@ else
   pass "no third-party dependencies"
 fi
 
-# 2. No networking, web, ads, tracking or analytics APIs in the source.
-DENY='NSURLSession|URLComponents|NSURLComponents|NSURL\b|dataRepresentation|resolvingBookmarkData|dlopen|NSClassFromString|URLSession|URLRequest|URLConnection|NWConnection|NWPathMonitor|NWListener|CFNetwork|CFSocket|CFStream|import Network|import WebKit|WKWebView|SFSafariViewController|import SafariServices|ASWebAuthenticationSession|import AdSupport|ASIdentifierManager|AppTrackingTransparency|ATTrackingManager|import StoreKit|import CloudKit|import MessageUI|import Firebase|import Sentry|import Crashlytics|import Amplitude|import Mixpanel|import Segment|https?://'
+# 2. No networking, web, ads, tracking or analytics APIs in the source. The last five are OS calls that make
+# the system fetch data for the app (embedding assets, a cloud language model, resource upload, downloadable
+# Vision assets), which no networking symbol would show.
+DENY='requestAssets|PrivateCloudComputeLanguageModel|PHAssetResourceUploadJob|downloadAssets|DownloadableAssetsRequest|NSURLSession|URLComponents|NSURLComponents|NSURL\b|dataRepresentation|resolvingBookmarkData|dlopen|NSClassFromString|URLSession|URLRequest|URLConnection|NWConnection|NWPathMonitor|NWListener|CFNetwork|CFSocket|CFStream|import Network|import WebKit|WKWebView|SFSafariViewController|import SafariServices|ASWebAuthenticationSession|import AdSupport|ASIdentifierManager|AppTrackingTransparency|ATTrackingManager|import StoreKit|import CloudKit|import MessageUI|import Firebase|import Sentry|import Crashlytics|import Amplitude|import Mixpanel|import Segment|https?://'
 hits=$(code_matching "$DENY")
 if [ -n "$hits" ]; then
   fail "network, web, ad or analytics API in source:"; echo "$hits"
