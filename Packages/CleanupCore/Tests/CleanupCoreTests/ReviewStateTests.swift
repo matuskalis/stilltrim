@@ -82,6 +82,53 @@ import Testing
         #expect(state.selectedIDs(in: .bigVideos).isEmpty)
     }
 
+    @Test func selectedIDsAboveAnItemAreTheSelectedOnesShownBeforeIt() {
+        var state = finishedState()
+        // On screen the group reads k, a, b, c and the selection is a, b, c.
+        let past: Set<String> = ["k", "a", "b", "c"]
+        #expect(state.selectedIDs(in: .similar, above: "c", scrolledPast: past) == ["a", "b"])
+        #expect(state.selectedIDs(in: .similar, above: "b", scrolledPast: past) == ["a"], "the item itself is not above")
+        #expect(state.selectedIDs(in: .similar, above: "a", scrolledPast: past).isEmpty, "only the unselected best photo is above")
+        state.deselect(["a"])
+        #expect(state.selectedIDs(in: .similar, above: "c", scrolledPast: past) == ["b"])
+    }
+
+    @Test func onlyPhotosTheListReportedAsScrolledPastAreAbove() {
+        let state = finishedState()
+        // A fast flick went over "a" and "b" without the list reporting them: they were never seen.
+        #expect(state.selectedIDs(in: .similar, above: "c", scrolledPast: ["k"]).isEmpty)
+        #expect(state.selectedIDs(in: .similar, above: "c", scrolledPast: ["a"]) == ["a"])
+        #expect(state.selectedIDs(in: .similar, above: "b", scrolledPast: ["a", "c"]) == ["a"], "c is below b")
+    }
+
+    @Test func theFirstShownItemAmongSomeIdsFollowsTheOrderOnScreen() {
+        let state = finishedState()
+        // On screen the group reads k, a, b, c.
+        #expect(state.firstShown(in: .similar, among: ["c", "b"]) == "b")
+        #expect(state.firstShown(in: .similar, among: ["c", "s1", "k"]) == "k")
+        #expect(state.firstShown(in: .similar, among: ["nope", "s1"]) == nil, "s1 is a screenshot, not in this category")
+        #expect(state.firstShown(in: .similar, among: []) == nil)
+    }
+
+    @Test func nothingIsAboveAnItemThatIsNotShown() {
+        let state = finishedState()
+        #expect(state.selectedIDs(in: .similar, above: "nope", scrolledPast: ["k", "a", "b", "c"]).isEmpty)
+        #expect(state.selectedIDs(in: .screenshots, above: "a", scrolledPast: ["a"]).isEmpty, "a similar photo is not in the screenshots")
+    }
+
+    @Test func aboveFollowsTheOrderOfTheSectionsOnScreen() {
+        var shots = ScanResult(screenshots: [
+            CleanupItem(id: "m1", byteSize: 100, creationDate: .distantPast, screenshotKind: .mix),
+            CleanupItem(id: "c1", byteSize: 500, creationDate: .distantPast, screenshotKind: .chat),
+        ])
+        shots.arrangeScreenshots()
+        var state = finishedState(shots)
+        state.select(["m1", "c1"])
+        // Chats are bigger, so they come first and the mixed one sits below them.
+        #expect(state.selectedIDs(in: .screenshots, above: "m1", scrolledPast: ["c1", "m1"]) == ["c1"])
+        #expect(state.selectedIDs(in: .screenshots, above: "c1", scrolledPast: ["c1", "m1"]).isEmpty)
+    }
+
     @Test func changesDuringAScanAreAppliedWhenItFinishes() {
         var state = ReviewState()
         state.beginScan()

@@ -89,4 +89,59 @@ import Testing
     @Test func allIDsCoversEveryCategory() {
         #expect(result.allIDs == ["s1", "s2", "k", "a", "b", "c", "q1", "v1"])
     }
+
+    private func shot(_ id: String, _ kind: ScreenshotKind?, bytes: Int64 = 1_000) -> CleanupItem {
+        CleanupItem(id: id, byteSize: bytes, creationDate: .distantPast, screenshotKind: kind)
+    }
+
+    @Test func screenshotsAreSectionedByKindBiggestFirstAndMixLast() {
+        var sectioned = ScanResult(screenshots: [
+            shot("m1", .mix, bytes: 9_000), shot("c1", .chat, bytes: 1_000),
+            shot("r1", .receipt, bytes: 5_000), shot("c2", .chat, bytes: 2_000),
+        ])
+        sectioned.arrangeScreenshots()
+        #expect(sectioned.screenshotSections.map(\.kind) == [.receipt, .chat, .mix])
+        #expect(sectioned.screenshotSections[1].items.map(\.id) == ["c1", "c2"], "equal dates fall back to the id")
+        #expect(sectioned.screenshotSections[1].byteSize == 3_000)
+    }
+
+    @Test func aScreenshotWithoutAKindIsMix() {
+        #expect(ScanResult(screenshots: [shot("x", nil)]).screenshotSections.map(\.kind) == [.mix])
+    }
+
+    @Test func sectionsOfEqualSizeKeepAFixedOrder() {
+        var sectioned = ScanResult(screenshots: [shot("w", .web), shot("c", .chat), shot("r", .receipt)])
+        sectioned.arrangeScreenshots()
+        #expect(sectioned.screenshotSections.map(\.kind) == [.chat, .receipt, .web])
+    }
+
+    @Test func screenshotItemsFollowTheOrderOnScreen() {
+        var sectioned = ScanResult(screenshots: [shot("m1", .mix), shot("c1", .chat, bytes: 5_000), shot("m2", .mix)])
+        sectioned.arrangeScreenshots()
+        #expect(sectioned.items(in: .screenshots).map(\.id) == ["c1", "m1", "m2"])
+    }
+
+    @Test func newestScreenshotsComeFirstInsideAKind() {
+        var sectioned = ScanResult(screenshots: [
+            CleanupItem(id: "old", byteSize: 1, creationDate: Date(timeIntervalSince1970: 100), screenshotKind: .chat),
+            CleanupItem(id: "new", byteSize: 1, creationDate: Date(timeIntervalSince1970: 900), screenshotKind: .chat),
+        ])
+        sectioned.arrangeScreenshots()
+        #expect(sectioned.screenshotSections[0].items.map(\.id) == ["new", "old"])
+    }
+
+    @Test func deletingFromASectionDoesNotReorderTheSections() {
+        var sectioned = ScanResult(screenshots: [
+            shot("c1", .chat, bytes: 5_000), shot("c2", .chat, bytes: 5_000), shot("r1", .receipt, bytes: 6_000),
+        ])
+        sectioned.arrangeScreenshots()
+        #expect(sectioned.screenshotSections.map(\.kind) == [.chat, .receipt])
+        // Chats now hold 5,000 bytes against 6,000 for receipts, and still stand first.
+        #expect(sectioned.removing(ids: ["c1"]).screenshotSections.map(\.kind) == [.chat, .receipt])
+    }
+
+    @Test func removingAScreenshotDropsItsSectionWhenItWasTheLast() {
+        let sectioned = ScanResult(screenshots: [shot("c1", .chat), shot("r1", .receipt)]).removing(ids: ["c1"])
+        #expect(sectioned.screenshotSections.map(\.kind) == [.receipt])
+    }
 }

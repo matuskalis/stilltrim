@@ -30,8 +30,25 @@ extension CleanupCategory {
     }
 }
 
+extension ScreenshotKind {
+    var title: String {
+        switch self {
+        case .chat: "Chats"
+        case .receipt: "Receipts and tickets"
+        case .code: "Codes and barcodes"
+        case .map: "Maps"
+        case .web: "Web pages"
+        case .social: "Social posts"
+        case .document: "Documents"
+        case .photo: "Pictures"
+        case .recording: "Screen recordings"
+        case .mix: "Mix"
+        }
+    }
+}
+
 struct ScanProgress: Sendable, Equatable {
-    enum Stage: Sendable { case listing, sizing, analyzing, grouping }
+    enum Stage: Sendable { case listing, sizing, analyzing, reading, grouping }
 
     var stage: Stage
     var done: Int
@@ -46,6 +63,7 @@ struct ScanProgress: Sendable, Equatable {
         case .listing: "Reading your library"
         case .sizing: "Measuring file sizes"
         case .analyzing: "Checking photo \(done.formatted()) of \(total.formatted())"
+        case .reading: "Reading screenshot \(done.formatted()) of \(total.formatted())"
         case .grouping: "Comparing photos"
         }
     }

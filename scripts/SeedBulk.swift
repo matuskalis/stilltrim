@@ -1,5 +1,7 @@
 // Generates N small JPEGs into folder argument 2 from the photos in argument 1, for scale tests.
-// About one in six is a near-duplicate of the photo before it. Run through scripts/seed-bulk.sh.
+// About one in six is a near-duplicate of the photo before it. With the argument "pairs", every second photo is an
+// exposure-shifted full-frame copy of the one before it, so the similar list holds count / 2 groups even with the
+// Simulator's stand-in fingerprint. Run through scripts/seed-bulk.sh.
 import CoreGraphics
 import CoreImage
 import CoreImage.CIFilterBuiltins
@@ -58,9 +60,18 @@ func write(_ image: CGImage, index: Int, seconds: Int) {
 }
 
 try? FileManager.default.createDirectory(atPath: out, withIntermediateDirectories: true)
+let pairs = CommandLine.arguments.contains("pairs")
 var clock = 0
 var previous: (source: Int, crop: Double)?
+var pairSource = 0
 for index in 0..<count {
+    if pairs {
+        let isCopy = index % 2 == 1
+        if !isCopy { pairSource = Int.random(in: 0..<sources.count, using: &rng) }
+        clock += isCopy ? Int.random(in: 2...40, using: &rng) : Int.random(in: 600...30_000, using: &rng)
+        write(variant(of: sources[pairSource], crop: 1, ev: isCopy ? Float.random(in: 0.15...0.3, using: &rng) : 0), index: index, seconds: clock)
+        continue
+    }
     if let previous, Int.random(in: 0..<6, using: &rng) == 0 {
         clock += Int.random(in: 2...40, using: &rng)
         write(variant(of: sources[previous.source], crop: previous.crop, ev: Float.random(in: -0.2...0.2, using: &rng)), index: index, seconds: clock)

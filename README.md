@@ -8,12 +8,12 @@ Status: version 0.1, a portfolio project. It is not on the App Store. You build 
 
 ## What it does
 
-- **Screenshots.** Whatever iOS flagged as a screenshot or screen recording.
+- **Screenshots.** Whatever iOS flagged as a screenshot or screen recording, sorted by what is on it: chats, receipts and tickets, codes and barcodes, maps, web pages, social posts, documents, pictures, screen recordings, and Mix for the rest. The phone reads the text and looks for barcodes to decide. Nothing is pre-selected, and each heading has a Select button.
 - **Similar shots.** Photos taken minutes apart that look alike. One is marked Best, the rest are pre-selected. Favourites, edited photos and the Best one are never pre-selected.
 - **Blurry and dark.** Very dark, overexposed, blank or blurry photos. Listed for review, never pre-selected.
 - **Big videos.** Videos of 50 MB or more, largest first.
 
-You tick what goes and tap Delete. iOS asks you to confirm, and the photos move to Recently Deleted. The space comes back when you empty it.
+You tick what goes and tap Delete. iOS asks you to confirm, and the photos move to Recently Deleted. The space comes back when you empty it. In a long list, Delete N above removes only the ticked photos you have already scrolled past, so you can work through it in batches.
 
 ## The promise, and how to check it
 
@@ -48,7 +48,7 @@ Not available. Both need a paid Apple Developer account.
 
 ## Simulator
 
-`xcodegen generate`, open the project and run on an iPhone 17 simulator. Vision does not work in the simulator, so add the launch argument `-tinyFingerprints` (Edit Scheme, Run, Arguments). It swaps in a simple stand-in and only takes effect in simulator builds, and Settings, About shows which similarity check is active. `scripts/seed-simulator.sh <UDID>` fills a simulator with test photos.
+`xcodegen generate`, open the project and run on an iPhone 17 simulator. Vision does not work in the simulator, so add the launch argument `-tinyFingerprints` (Edit Scheme, Run, Arguments). It swaps in a simple stand-in and only takes effect in simulator builds, and Settings, About shows which similarity check is active. Reading screenshots needs Vision too, so in the simulator every screenshot lands in Mix. `scripts/seed-simulator.sh <UDID>` fills a simulator with test photos.
 
 ## Checks
 

@@ -9,6 +9,8 @@ enum ScanError: Error {
 struct ScanPipeline: Sendable {
     static let bigVideoBytes: Int64 = 50_000_000
     static let thumbnailSide: CGFloat = 512
+    /// Small print on a phone screenshot needs more pixels than a similarity check does.
+    static let screenshotSide: CGFloat = 1_024
     static let maxConcurrentAnalyses = 4
     private static let sizingBatch = 500
     private static let saveEvery = 1_500
@@ -45,15 +47,16 @@ struct ScanPipeline: Sendable {
 
         var result = ScanResult()
         var photos: [AssetRecord] = []
+        var screenshots: [AssetRecord] = []
         for record in records {
             let bytes = entries[record.id]?.byteSize ?? 0
             switch record.kind {
             case .video where record.isScreenRecording:
-                result.screenshots.append(item(record, bytes: bytes, badge: "Recording"))
+                result.screenshots.append(item(record, bytes: bytes, screenshotKind: .recording))
             case .video where bytes >= Self.bigVideoBytes:
                 result.bigVideos.append(item(record, bytes: bytes))
             case .photo where record.isScreenshot:
-                result.screenshots.append(item(record, bytes: bytes))
+                screenshots.append(record)
             case .photo:
                 photos.append(record)
             default:
@@ -63,8 +66,16 @@ struct ScanPipeline: Sendable {
         result.scannedPhotos = photos.count
 
         result.notOnDevice = try await analyze(photos, entries: &entries, progress: progress)
+        try await readScreenshots(screenshots, entries: &entries, progress: progress)
         await cache.save()
         try Task.checkCancellation()
+
+        for record in screenshots {
+            let entry = entries[record.id]
+            result.screenshots.append(item(
+                record, bytes: entry?.byteSize ?? 0, screenshotKind: entry?.currentScreenshotKind ?? .mix
+            ))
+        }
 
         progress(ScanProgress(stage: .grouping, done: 0, total: 0))
         let groups = makeGroups(photos: photos, entries: entries)
@@ -79,7 +90,7 @@ struct ScanPipeline: Sendable {
             result.lowQuality.append(item(record, bytes: entries[record.id]?.byteSize ?? 0, badge: Self.badge(for: issue)))
         }
 
-        result.screenshots.sort { $0.creationDate > $1.creationDate }
+        result.arrangeScreenshots()
         result.lowQuality.sort { $0.byteSize > $1.byteSize }
         result.bigVideos.sort { $0.byteSize > $1.byteSize }
         result.similarGroups.sort { $0.reclaimableBytes > $1.reclaimableBytes }
@@ -166,6 +177,48 @@ struct ScanPipeline: Sendable {
         return notOnDevice
     }
 
+    /// Reads each screenshot once and remembers its kind. One Vision cannot read this time is shown
+    /// under "Mix" and tried again on the next scan.
+    private func readScreenshots(
+        _ screenshots: [AssetRecord], entries: inout [String: AnalysisCache.Entry],
+        progress: @Sendable (ScanProgress) -> Void
+    ) async throws {
+        let pending = screenshots.filter { entries[$0.id]?.currentScreenshotKind == nil }
+        guard !pending.isEmpty else { return }
+        var done = 0
+        progress(ScanProgress(stage: .reading, done: 0, total: pending.count))
+
+        try await withThrowingTaskGroup(of: (id: String, kind: ScreenshotKind?).self) { group in
+            var next = pending.makeIterator()
+            func addNext() {
+                guard let record = next.next() else { return }
+                group.addTask { (record.id, await readKind(of: record)) }
+            }
+            for _ in 0..<Self.maxConcurrentAnalyses { addNext() }
+
+            while let outcome = try await group.next() {
+                try Task.checkCancellation()
+                if let kind = outcome.kind, var entry = entries[outcome.id] {
+                    entry.screenshotKind = kind
+                    entry.classifierVersion = ScreenshotClassifier.version
+                    entries[outcome.id] = entry
+                    await cache.store(entry, for: outcome.id)
+                }
+                done += 1
+                if done % 8 == 0 || done == pending.count {
+                    progress(ScanProgress(stage: .reading, done: done, total: pending.count))
+                }
+                addNext()
+            }
+        }
+    }
+
+    private func readKind(of record: AssetRecord) async -> ScreenshotKind? {
+        guard case let .image(image) = await library.thumbnail(for: record.id, side: Self.screenshotSide, exact: true)
+        else { return nil }
+        return try? ScreenshotAnalyzer.kind(of: image)
+    }
+
     private func analyzeOne(_ record: AssetRecord) async -> AnalysisOutcome {
         switch await library.thumbnail(for: record.id, side: Self.thumbnailSide, exact: true) {
         case let .image(image):
@@ -203,10 +256,14 @@ struct ScanPipeline: Sendable {
         }
     }
 
-    private func item(_ record: AssetRecord, bytes: Int64, badge: String? = nil, isKeeper: Bool = false) -> CleanupItem {
+    private func item(
+        _ record: AssetRecord, bytes: Int64, badge: String? = nil, screenshotKind: ScreenshotKind? = nil,
+        isKeeper: Bool = false
+    ) -> CleanupItem {
         CleanupItem(
             id: record.id, byteSize: bytes, creationDate: record.creationDate,
-            duration: record.kind == .video ? record.duration : nil, badge: badge, isKeeper: isKeeper
+            duration: record.kind == .video ? record.duration : nil, badge: badge,
+            screenshotKind: screenshotKind, isKeeper: isKeeper
         )
     }
 

@@ -91,6 +91,25 @@ public struct ReviewState: Sendable {
         return Set(result.items(in: category).map(\.id)).intersection(selection)
     }
 
+    /// The first item of the category, in the order it is shown, that is among `ids`: where the user is
+    /// when `ids` are the photos not yet scrolled past.
+    public func firstShown(in category: CleanupCategory, among ids: Set<String>) -> String? {
+        result?.items(in: category).first { ids.contains($0.id) }?.id
+    }
+
+    /// The selected items the user has scrolled past: shown before `top` and reported as scrolled past by
+    /// the list. A row a fast flick went over without the list ever reporting it is not included, and
+    /// nothing is returned when `top` is not shown, so a stale position never widens what gets deleted.
+    public func selectedIDs(in category: CleanupCategory, above top: String, scrolledPast: Set<String>) -> Set<String> {
+        guard let result else { return [] }
+        var above = Set<String>()
+        for item in result.items(in: category) {
+            if item.id == top { return above }
+            if selection.contains(item.id), scrolledPast.contains(item.id) { above.insert(item.id) }
+        }
+        return []
+    }
+
     // MARK: Consistency
 
     private mutating func apply(_ new: ScanResult?) {

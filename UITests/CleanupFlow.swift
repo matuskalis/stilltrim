@@ -16,15 +16,19 @@ final class CleanupFlow: SimulatorOnlyTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 120), "scan did not finish")
         row.tap()
 
+        let sectionSelect = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'select-'")).firstMatch
+        XCTAssertTrue(sectionSelect.waitForExistence(timeout: 5), "the screenshots have no heading with a select button")
+        sectionSelect.tap()
+        XCTAssertFalse(app.buttons["Select items to delete"].exists, "the heading did not select its screenshots")
+        sectionSelect.tap()
+        XCTAssertTrue(app.buttons["Select items to delete"].waitForExistence(timeout: 5), "the heading did not deselect them")
+
         app.buttons["Select all"].tap()
         let delete = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete'")).firstMatch
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
 
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let alert = springboard.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 15), "iOS did not show its own delete confirmation")
-        alert.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete'")).firstMatch.tap()
+        confirmSystemDeletion()
 
         XCTAssertTrue(app.staticTexts["3 deleted"].waitForExistence(timeout: 20))
     }

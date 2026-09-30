@@ -35,7 +35,7 @@ jobs:
       # The Vision tests need the Neural Engine or a GPU. A virtual machine may have neither, so they
       # stay local (scripts/verify.sh runs them on a real Mac).
       - name: Unit tests
-        run: cd Packages/CleanupCore && swift test --skip 'FingerprintTests/vision' --skip 'FingerprintTests/ourDistance'
+        run: cd Packages/CleanupCore && swift test --skip 'FingerprintTests/vision' --skip 'FingerprintTests/ourDistance' --skip ScreenshotAnalyzerTests
 
       - name: Build for the simulator
         run: |

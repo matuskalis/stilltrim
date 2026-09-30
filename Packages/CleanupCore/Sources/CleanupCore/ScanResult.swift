@@ -12,19 +12,31 @@ public struct CleanupItem: Identifiable, Sendable, Hashable {
     public let creationDate: Date
     public let duration: TimeInterval?
     public let badge: String?
+    public let screenshotKind: ScreenshotKind?
     public var isKeeper: Bool
 
     public init(
         id: String, byteSize: Int64, creationDate: Date, duration: TimeInterval? = nil,
-        badge: String? = nil, isKeeper: Bool = false
+        badge: String? = nil, screenshotKind: ScreenshotKind? = nil, isKeeper: Bool = false
     ) {
         self.id = id
         self.byteSize = byteSize
         self.creationDate = creationDate
         self.duration = duration
         self.badge = badge
+        self.screenshotKind = screenshotKind
         self.isKeeper = isKeeper
     }
+}
+
+/// The screenshots of one kind, as shown under one heading.
+public struct ScreenshotSection: Identifiable, Sendable, Hashable {
+    public let kind: ScreenshotKind
+    public let items: [CleanupItem]
+
+    public var id: String { kind.rawValue }
+
+    public var byteSize: Int64 { items.reduce(0) { $0 + $1.byteSize } }
 }
 
 public struct SimilarGroup: Identifiable, Sendable, Hashable {
@@ -87,9 +99,42 @@ public struct ScanResult: Sendable {
         self.scannedPhotos = scannedPhotos
     }
 
+    /// Puts the screenshots in the order they are shown: kinds biggest first with "mix" last, newest first
+    /// inside a kind. Call it once when a scan ends. The order then stays, so deleting from one kind never
+    /// moves it below another while the user is looking at the list.
+    public mutating func arrangeScreenshots() {
+        var bytes: [ScreenshotKind: Int64] = [:]
+        for item in screenshots { bytes[item.screenshotKind ?? .mix, default: 0] += item.byteSize }
+        let kinds = bytes.keys.sorted { a, b in
+            if (a == .mix) != (b == .mix) { return b == .mix }
+            if bytes[a] != bytes[b] { return (bytes[a] ?? 0) > (bytes[b] ?? 0) }
+            return a.rawValue < b.rawValue
+        }
+        let rank = Dictionary(uniqueKeysWithValues: kinds.enumerated().map { ($1, $0) })
+        screenshots.sort { a, b in
+            let (rankA, rankB) = (rank[a.screenshotKind ?? .mix] ?? 0, rank[b.screenshotKind ?? .mix] ?? 0)
+            if rankA != rankB { return rankA < rankB }
+            if a.creationDate != b.creationDate { return a.creationDate > b.creationDate }
+            return a.id < b.id
+        }
+    }
+
+    /// The screenshots grouped by kind, in the order they stand in `screenshots`.
+    public var screenshotSections: [ScreenshotSection] {
+        var order: [ScreenshotKind] = []
+        var grouped: [ScreenshotKind: [CleanupItem]] = [:]
+        for item in screenshots {
+            let kind = item.screenshotKind ?? .mix
+            if grouped[kind] == nil { order.append(kind) }
+            grouped[kind, default: []].append(item)
+        }
+        return order.map { ScreenshotSection(kind: $0, items: grouped[$0] ?? []) }
+    }
+
+    /// In the order they are shown, so "above" and "below" mean the same here and on screen.
     public func items(in category: CleanupCategory) -> [CleanupItem] {
         switch category {
-        case .screenshots: screenshots
+        case .screenshots: screenshotSections.flatMap(\.items)
         case .similar: similarGroups.flatMap(\.items)
         case .lowQuality: lowQuality
         case .bigVideos: bigVideos

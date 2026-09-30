@@ -173,6 +173,14 @@ final class AppModel {
         review.selectedIDs(in: category)
     }
 
+    func selectedIDs(in category: CleanupCategory, above top: String, scrolledPast: Set<String>) -> Set<String> {
+        review.selectedIDs(in: category, above: top, scrolledPast: scrolledPast)
+    }
+
+    func firstShown(in category: CleanupCategory, among ids: Set<String>) -> String? {
+        review.firstShown(in: category, among: ids)
+    }
+
     func delete(ids requested: Set<String>) async {
         guard !requested.isEmpty, let before = review.result else { return }
         deletionError = nil

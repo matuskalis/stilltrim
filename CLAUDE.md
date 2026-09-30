@@ -19,6 +19,7 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - `scripts/verify.sh` runs package tests, the simulator build and the privacy guard, then prints READY or NOT-READY. `--ui` adds the UI tests (scheme `Stilltrim-UITests`).
 - `scripts/render-icon.sh` renders `Design/AppIcon.svg` into the asset catalog. Releases: push a tag `v0.1.0` and `.github/workflows/release.yml` builds the unsigned IPA.
 - `cd Packages/CleanupCore && swift test` is the fastest loop for the pure logic.
+- `scripts/classify-folder.sh <folder> [--dump]` classifies every image in a folder with the app's Vision classifier on the Mac (AirDrop real screenshots to try it); `--dump` also prints the recognised text.
 - `scripts/seed-simulator.sh <UDID>` fills a simulator library with near-duplicates, blurry and blank frames, screenshots and a 78 MB video. `scripts/seed-bulk.sh <UDID> 2000` adds a scale set.
 - Debug launch arguments: `-autoScan`, `-tinyFingerprints`, `-openCategory similar|screenshots|lowQuality|bigVideos`.
 
@@ -32,6 +33,9 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - Seeded screenshots carry EXIF UserComment "Screenshot" so Photos flags them. Screen recordings cannot be seeded.
 - The first UI test run right after `simctl erase` failed once in four (the photo permission ended up denied and the scan never started). Reset it with `xcrun simctl privacy <udid> reset photos com.matuskalis.stilltrim` and rerun. The helper says so when it sees the denied state.
 - `UITests/CleanupFlow` deletes the seeded screenshots. Reseed before running it again.
+- Vision fails in the simulator for text, scene labels and barcodes too ("Failed to create espresso context"), so every seeded screenshot is read as Mix there. Kinds are checked by the classifier tests, the Mac-only `ScreenshotAnalyzerTests`, and on a phone.
+- Never put `scrollPosition(id:)` or `scrollTargetLayout()` on the review grid. On the seeded similar list (about 35 groups) the main thread sat at 100% in `LazySubviewPlacements` and the app froze (measured 30 Sep 2026; the old layout, and the same grid without scroll tracking, were fine). `ReviewView` tracks scrolled-past cells with `onGeometryChange` instead.
+- `UITests/DeleteAbove` needs a long similar list: `scripts/seed-bulk.sh <UDID> 800 pairs` (the plain bulk set forms only about 35 groups with the stand-in fingerprint). It deletes photos: add more pairs before running it again, and it skips itself when the list is short.
 - `UITests/ScanControl` (cancel, erase mid-scan) needs `scripts/seed-bulk.sh <UDID> 2000` and skips itself on a small library.
 
 ## Repositories

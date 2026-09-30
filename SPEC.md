@@ -38,6 +38,8 @@ At most 4 analyses run at once. The screen stays awake during a scan. Progress i
 
 Screenshots and recordings: `mediaSubtypes` contains `.photoScreenshot` or `.videoScreenRecording`. Nothing pre-selected, "Select all" available.
 
+Each screenshot is filed under one kind: chats, receipts and tickets, codes and barcodes, maps, web pages, social posts, documents, pictures, or Mix when nothing fits. Recordings are a kind of their own. The review shows the biggest kind first and Mix last, each under a heading with its own Select button. `ScreenshotClassifier` in CleanupCore decides, from rules and without Vision, so `swift test` covers it. `ScreenshotAnalyzer` feeds it from a 1,024 px copy of the screenshot: Vision text recognition at the fast level (the accurate level needed 63 s to prepare its model the first time), barcode detection and Vision's scene labels, all on the phone. Each kind earns a score from a few signals: clock times with bubbles on both sides for chats, amounts and order words for receipts, a barcode or a verification code for codes, distances and a map label for maps, a domain at the top with cookie words for web pages, handles and like counts for social posts, a dense page of long lines for documents, a strong scene label with almost no text for pictures. The status bar and home indicator strips are ignored, and words are matched without accents, so a Slovak receipt works. Below a score of 0.5 the answer is Mix. A wrong guess only files a screenshot under another heading, nothing is selected by kind. A screenshot Vision cannot read this time is shown under Mix and read again on the next scan.
+
 Similar shots: a Vision feature print per photo (revision 2 pinned, 768 values), compared with the next photos in creation order (at most 30, within 10 minutes). Leader clustering: a photo joins the earliest group whose first photo it is within 0.45 of, so a slow drift across a burst cannot merge the two ends. The keeper of a group is chosen by favourite, then edited, then resolution, then file size, then the earliest photo. Every other photo is pre-selected, except favourites and edited photos.
 
 Why file size and not sharpness: on 16 photographs against recompressed, cropped, downsized and blurred copies of the same photo, file size picked the original 16 times of 16. Laplacian sharpness picked it once, because JPEG blocking adds edges.
@@ -60,9 +62,11 @@ Results follow the library. A `PHPhotoLibraryChangeObserver` drops every scanned
 
 A thumbnail request ends when the scan is cancelled or after 30 seconds, and a degraded preview of an iCloud photo counts as "not on this phone", so a scan can always be stopped and erasing app data cannot hang.
 
+Delete above: a long list is worked through in batches. `ReviewState.selectedIDs(in:above:)` returns the selected ids that come before the photo at the top of the screen, in the order `ScanResult.items(in:)` gives, which is the order on screen. When that photo is not in the result (it was just deleted) nothing is above it, so a stale position can never widen what gets deleted. iOS still asks for its own confirmation each time.
+
 ### Cache
 
-One binary plist in Application Support, keyed by `localIdentifier`, valid while `modificationDate` is unchanged. It holds the half-precision feature print, quality metrics, byte size and an edited flag. The header names the fingerprinter, so a different fingerprinter or file version drops the cache. Excluded from backup. "Erase app data" deletes it together with the keep list.
+One binary plist in Application Support, keyed by `localIdentifier`, valid while `modificationDate` is unchanged. It holds the half-precision feature print, quality metrics, byte size and an edited flag, and for a screenshot its kind together with the classifier version that chose it (a new version reads screenshots again and leaves the fingerprints alone). The header names the fingerprinter, so a different fingerprinter or file version drops the cache. Excluded from backup. "Erase app data" deletes it together with the keep list.
 
 Measured: 1.7 KB per photo (3.5 MB for 2,031 photos), so about 34 MB at 20,000 photos.
 
@@ -72,7 +76,7 @@ File size comes from `PHAssetResource` through the key-value keys `fileSize` and
 
 1. Welcome: the promise in three lines, one button to grant access.
 2. Home: total reclaimable space, four category rows with count and size, scan progress.
-3. Review: thumbnail grid, tap to select, tap-hold for preview and "Keep". Similar shots show as groups with a "Best" mark. Bottom bar: "Delete N · X MB".
+3. Review: thumbnail grid, tap to select, tap-hold for preview and "Keep". Similar shots show as groups with a "Best" mark. Screenshots sit under a heading per kind with a Select button. Bottom bar: "Delete N · X MB", and "Delete N above" once some ticked photos have been scrolled past.
 4. Done: space freed once Recently Deleted is emptied, with steps.
 5. Settings: privacy in plain words and how to verify it (airplane mode, iOS App Privacy Report), manage limited access, erase app data.
 
@@ -90,6 +94,7 @@ Look: native iOS, SF, system materials, one accent colour (red). The selection m
 ## Findings
 
 - The iOS 26.1 simulator cannot run Vision feature prints: the default path throws "Failed to create espresso context", and forcing the CPU returns near-identical vectors for different photos. The simulator uses `TinyImageFingerprinter` (16x16 thumbnail) through `-tinyFingerprints`. Vision is verified on the Mac and needs a device pass.
+- Text recognition, scene labels and barcode detection fail the same way in the simulator, so every screenshot lands in Mix there. The rules are covered by `ScreenshotClassifierTests`, Vision on drawn screens by `ScreenshotAnalyzerTests` (Mac only), and real screenshots need a device pass.
 - Vision revision 2 distances on 16 photographs: different scenes start at 0.72, same-scene variants (recompressed, cropped, exposure shifted) stay at or below 0.44. The 0.45 threshold sits in that gap.
 - `simctl privacy grant photos` does not work on this simulator, the UI test accepts the prompt instead.
 - Scale, 2,031 photos in the simulator with an optimized build: cold scan 18.6 s, warm rescan 0.44 s. A Debug build is about 6 times slower in the analysis stage.
@@ -106,8 +111,8 @@ The second checked those fixes and found 3 more: a photo promoted to best after 
 1. Look up sizes only for candidates (screenshots, videos, group members, flagged photos), not for every asset.
 2. Exact duplicates anywhere in the library (same pixel size and byte size, confirmed by feature print). Needs sizes for all photos, so it waits for step 1.
 3. Real-device pass on a large library. First run done on 30 Sep 2026: installed on a physical iPhone with `scripts/install-on-iphone.sh`, scanned, and the owner reports it works well. Still to record: scan time and library size, false alarms in Blurry and dark, whether the Best picks are right, iCloud Optimize Storage behaviour, and whether the app's own large batch delete reaches the change observer as a non-incremental change (that would clear the results after a successful delete, which is safe but should not happen). Settings, About shows which similarity check is active.
-4. Later, decided but not built: exact duplicates anywhere, smarter screenshots (label only), aesthetics score as a tie-break behind `#available(iOS 18)`, user-album protection, a strictness control, quick scan first. Ranking and effort: `docs/research/features-and-pipeline.md`.
+4. Later, decided but not built: exact duplicates anywhere, aesthetics score as a tie-break behind `#available(iOS 18)`, user-album protection, a strictness control, quick scan first. Ranking and effort: `docs/research/features-and-pipeline.md`.
 
 ## Out of scope for v1
 
-Paywall, sync, widgets, Slovak strings, OCR-based smart suggestions, aesthetics scoring (needs iOS 18), Live Photo to still conversion, background scanning.
+Paywall, sync, widgets, Slovak strings, suggestions chosen by what a screenshot says (kinds only sort them), aesthetics scoring (needs iOS 18), Live Photo to still conversion, background scanning.

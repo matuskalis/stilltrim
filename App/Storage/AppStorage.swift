@@ -20,6 +20,14 @@ actor AnalysisCache {
         var isEdited: Bool
         var metrics: ImageMetrics?
         var fingerprint: Data?
+        var screenshotKind: ScreenshotKind?
+        /// The classifier rules that chose `screenshotKind`.
+        var classifierVersion: Int?
+
+        /// Nil when the screenshot was never read, or was read under older rules.
+        var currentScreenshotKind: ScreenshotKind? {
+            classifierVersion == ScreenshotClassifier.version ? screenshotKind : nil
+        }
     }
 
     private struct File: Codable {
