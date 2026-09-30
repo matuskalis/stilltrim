@@ -92,6 +92,11 @@ public struct SimilarGroup: Identifiable, Sendable, Hashable {
     }
 }
 
+/// What the toolbar button of a category does next.
+public enum BulkSelectionAction: Sendable, Equatable {
+    case select, deselectAll, none
+}
+
 public struct ScanResult: Sendable {
     public var screenshots: [CleanupItem]
     public var similarGroups: [SimilarGroup]
@@ -199,6 +204,17 @@ public struct ScanResult: Sendable {
     /// already leaves the best photo and the protected ones unticked.
     public func protectedCountLeftOut(in category: CleanupCategory) -> Int {
         category == .similar ? 0 : items(in: category).filter(\.isProtected).count
+    }
+
+    /// Deselecting is offered when everything bulk-selectable is ticked, or when nothing is bulk-selectable
+    /// (every item protected) but the user ticked some by hand. With nothing to do the button is off.
+    public func bulkSelectionAction(in category: CleanupCategory, selection: Set<String>) -> BulkSelectionAction {
+        let selectable = bulkSelectableIDs(in: category)
+        if selectable.isEmpty {
+            let ticked = items(in: category).contains { selection.contains($0.id) }
+            return ticked ? .deselectAll : .none
+        }
+        return selectable.isSubset(of: selection) ? .deselectAll : .select
     }
 
     /// The best photo of every similar group.

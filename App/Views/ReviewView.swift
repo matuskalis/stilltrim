@@ -70,6 +70,7 @@ struct ReviewView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(selectionButtonTitle, action: toggleAll)
+                    .disabled(bulkAction == .none)
             }
         }
         .sheet(item: $preview) { PreviewView(id: $0.id) }
@@ -202,21 +203,21 @@ struct ReviewView: View {
         model.result?.bulkSelectableIDs(in: category) ?? []
     }
 
-    private var allSelectableSelected: Bool {
-        !selectableIDs.isEmpty && selectableIDs.isSubset(of: model.selection)
+    private var bulkAction: BulkSelectionAction {
+        model.result?.bulkSelectionAction(in: category, selection: model.selection) ?? .none
     }
 
     private var selectionButtonTitle: String {
-        if allSelectableSelected { return "Deselect all" }
+        if bulkAction == .deselectAll { return "Deselect all" }
         return category == .similar ? "Select suggested" : "Select all"
     }
 
     /// Deselecting clears everything in this category, including photos picked by hand.
     private func toggleAll() {
-        if allSelectableSelected {
-            model.deselect(ids: Set(model.result?.items(in: category).map(\.id) ?? []))
-        } else {
-            model.select(ids: selectableIDs)
+        switch bulkAction {
+        case .deselectAll: model.deselect(ids: Set(model.result?.items(in: category).map(\.id) ?? []))
+        case .select: model.select(ids: selectableIDs)
+        case .none: break
         }
     }
 }

@@ -195,6 +195,17 @@ import Testing
         #expect(recordings.protectedCountLeftOut == 1)
     }
 
+    @Test func theToolbarButtonFollowsWhatIsSelectable() {
+        let all = mixedResult
+        #expect(all.bulkSelectionAction(in: .lowQuality, selection: []) == .select)
+        #expect(all.bulkSelectionAction(in: .lowQuality, selection: ["q1"]) == .deselectAll)
+        #expect(all.bulkSelectionAction(in: .bigVideos, selection: []) == .none)
+        #expect(all.bulkSelectionAction(in: .bigVideos, selection: ["v1"]) == .deselectAll)
+        #expect(all.bulkSelectionAction(in: .similar, selection: []) == .select)
+        #expect(all.bulkSelectionAction(in: .similar, selection: all.suggestedSelection) == .deselectAll)
+        #expect(ScanResult().bulkSelectionAction(in: .screenshots, selection: []) == .none)
+    }
+
     @Test func protectionChangesNeitherTotalsNorSizes() {
         #expect(mixedResult.removableCount(in: .bigVideos) == 2)
         #expect(mixedResult.reclaimableBytes(in: .bigVideos) == 2_000)
