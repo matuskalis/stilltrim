@@ -144,4 +144,72 @@ import Testing
         let sectioned = ScanResult(screenshots: [shot("c1", .chat), shot("r1", .receipt)]).removing(ids: ["c1"])
         #expect(sectioned.screenshotSections.map(\.kind) == [.receipt])
     }
+
+    private func protectedItem(_ id: String, favorite: Bool = false, edited: Bool = false, bytes: Int64 = 1_000) -> CleanupItem {
+        CleanupItem(id: id, byteSize: bytes, creationDate: .distantPast, isFavorite: favorite, isEdited: edited)
+    }
+
+    private var mixedResult: ScanResult {
+        ScanResult(
+            screenshots: [
+                protectedItem("s1"), protectedItem("s2", favorite: true),
+                CleanupItem(id: "r1", byteSize: 1_000, creationDate: .distantPast, screenshotKind: .recording, isEdited: true),
+                CleanupItem(id: "r2", byteSize: 1_000, creationDate: .distantPast, screenshotKind: .recording),
+            ],
+            similarGroups: [group()],
+            lowQuality: [protectedItem("q1"), protectedItem("q2", edited: true)],
+            bigVideos: [protectedItem("v1", favorite: true), protectedItem("v2", favorite: true, edited: true)]
+        )
+    }
+
+    @Test func anItemIsProtectedWhenFavouriteOrEdited() {
+        #expect(!protectedItem("a").isProtected)
+        #expect(protectedItem("a", favorite: true).isProtected)
+        #expect(protectedItem("a", edited: true).isProtected)
+    }
+
+    @Test func bulkSelectionSkipsFavouritesAndEditedPhotosOutsideSimilarGroups() {
+        #expect(mixedResult.bulkSelectableIDs(in: .screenshots) == ["s1", "r2"])
+        #expect(mixedResult.bulkSelectableIDs(in: .lowQuality) == ["q1"])
+        #expect(mixedResult.bulkSelectableIDs(in: .bigVideos).isEmpty)
+    }
+
+    @Test func bulkSelectionInSimilarGroupsIsTheSuggestion() {
+        #expect(mixedResult.bulkSelectableIDs(in: .similar) == mixedResult.suggestedSelection)
+        #expect(mixedResult.protectedCountLeftOut(in: .similar) == 0)
+    }
+
+    @Test func protectedItemsLeftOutAreCounted() {
+        #expect(mixedResult.protectedCountLeftOut(in: .screenshots) == 2)
+        #expect(mixedResult.protectedCountLeftOut(in: .lowQuality) == 1)
+        #expect(mixedResult.protectedCountLeftOut(in: .bigVideos) == 2)
+    }
+
+    @Test func aScreenshotSectionSkipsProtectedItemsToo() throws {
+        let sections = mixedResult.screenshotSections
+        let mix = try #require(sections.first { $0.kind == .mix })
+        let recordings = try #require(sections.first { $0.kind == .recording })
+        #expect(mix.bulkSelectableIDs == ["s1"])
+        #expect(mix.protectedCountLeftOut == 1)
+        #expect(recordings.bulkSelectableIDs == ["r2"])
+        #expect(recordings.protectedCountLeftOut == 1)
+    }
+
+    @Test func theToolbarButtonFollowsWhatIsSelectable() {
+        let all = mixedResult
+        #expect(all.bulkSelectionAction(in: .lowQuality, selection: []) == .select)
+        #expect(all.bulkSelectionAction(in: .lowQuality, selection: ["q1"]) == .deselectAll)
+        #expect(all.bulkSelectionAction(in: .bigVideos, selection: []) == .none)
+        #expect(all.bulkSelectionAction(in: .bigVideos, selection: ["v1"]) == .deselectAll)
+        #expect(all.bulkSelectionAction(in: .similar, selection: []) == .select)
+        #expect(all.bulkSelectionAction(in: .similar, selection: all.suggestedSelection) == .deselectAll)
+        #expect(ScanResult().bulkSelectionAction(in: .screenshots, selection: []) == .none)
+    }
+
+    @Test func protectionChangesNeitherTotalsNorSizes() {
+        #expect(mixedResult.removableCount(in: .bigVideos) == 2)
+        #expect(mixedResult.reclaimableBytes(in: .bigVideos) == 2_000)
+        #expect(mixedResult.byteSize(of: ["v1", "v2", "q2"]) == 3_000)
+        #expect(mixedResult.screenshotSections.map(\.byteSize).reduce(0, +) == 4_000)
+    }
 }

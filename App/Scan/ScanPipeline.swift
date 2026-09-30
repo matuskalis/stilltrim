@@ -54,9 +54,9 @@ struct ScanPipeline: Sendable {
             let bytes = entries[record.id]?.byteSize ?? 0
             switch record.kind {
             case .video where record.isScreenRecording:
-                result.screenshots.append(item(record, bytes: bytes, screenshotKind: .recording))
+                result.screenshots.append(item(record, bytes: bytes, screenshotKind: .recording, isEdited: entries[record.id]?.isEdited ?? false))
             case .video where bytes >= Self.bigVideoBytes:
-                result.bigVideos.append(item(record, bytes: bytes))
+                result.bigVideos.append(item(record, bytes: bytes, isEdited: entries[record.id]?.isEdited ?? false))
             case .photo where record.isScreenshot:
                 screenshots.append(record)
             case .photo:
@@ -75,7 +75,8 @@ struct ScanPipeline: Sendable {
         for record in screenshots {
             let entry = entries[record.id]
             result.screenshots.append(item(
-                record, bytes: entry?.byteSize ?? 0, screenshotKind: entry?.currentScreenshotKind ?? .mix
+                record, bytes: entry?.byteSize ?? 0, screenshotKind: entry?.currentScreenshotKind ?? .mix,
+                isEdited: entry?.isEdited ?? false
             ))
         }
 
@@ -89,7 +90,7 @@ struct ScanPipeline: Sendable {
         let thresholds = QualityThresholds.standard
         for record in photos where !grouped.contains(record.id) {
             guard let metrics = entries[record.id]?.metrics, let issue = thresholds.issue(for: metrics) else { continue }
-            result.lowQuality.append(item(record, bytes: entries[record.id]?.byteSize ?? 0, badge: Self.badge(for: issue)))
+            result.lowQuality.append(item(record, bytes: entries[record.id]?.byteSize ?? 0, badge: Self.badge(for: issue), isEdited: entries[record.id]?.isEdited ?? false))
         }
 
         result.arrangeScreenshots()
@@ -249,7 +250,7 @@ struct ScanPipeline: Sendable {
         return SimilarityGrouper.groups(from: groupingItems).map { group in
             let items = group.memberIDs.compactMap { id -> CleanupItem? in
                 guard let record = records[id] else { return nil }
-                return item(record, bytes: entries[id]?.byteSize ?? 0, isKeeper: id == group.keeperID)
+                return item(record, bytes: entries[id]?.byteSize ?? 0, isKeeper: id == group.keeperID, isEdited: entries[id]?.isEdited ?? false)
             }
             return SimilarGroup(
                 id: group.keeperID, items: items, suggestedRemovalIDs: Set(group.suggestedRemovalIDs),
@@ -260,12 +261,13 @@ struct ScanPipeline: Sendable {
 
     private func item(
         _ record: AssetRecord, bytes: Int64, badge: String? = nil, screenshotKind: ScreenshotKind? = nil,
-        isKeeper: Bool = false
+        isKeeper: Bool = false, isEdited: Bool
     ) -> CleanupItem {
         CleanupItem(
             id: record.id, byteSize: bytes, creationDate: record.creationDate,
             duration: record.kind == .video ? record.duration : nil, badge: badge,
-            screenshotKind: screenshotKind, isKeeper: isKeeper
+            screenshotKind: screenshotKind, isKeeper: isKeeper,
+            isFavorite: record.isFavorite, isEdited: isEdited
         )
     }
 

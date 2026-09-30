@@ -197,4 +197,16 @@ import Testing
         #expect(state.selection.isEmpty)
         #expect(state.isScanning == false)
     }
+
+    @Test func aProtectedItemCanStillBeTickedByHand() {
+        let favourite = CleanupItem(id: "f", byteSize: 1_000, creationDate: .distantPast, isFavorite: true)
+        let plain = item("p")
+        var state = finishedState(ScanResult(lowQuality: [favourite, plain]))
+        let ids = state.result?.bulkSelectableIDs(in: .lowQuality) ?? []
+        state.select(ids)
+        #expect(state.selection == ["p"])
+        state.toggle("f")
+        #expect(state.selection == ["p", "f"])
+        #expect(state.selectedIDs(in: .lowQuality) == ["p", "f"])
+    }
 }

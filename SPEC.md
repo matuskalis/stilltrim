@@ -56,6 +56,8 @@ Deletion goes through `PHAssetChangeRequest.deleteAssets`. iOS shows its own con
 
 "Keep" on an item adds it to an on-device keep list and it never shows again. The best photo of a group is kept anyway, so it has no "Keep" action.
 
+A bulk action ("Select all", a screenshot section's "Select") never selects a favourite or an edited photo. They carry a small heart or pencil mark, a line above the grid says how many were left out, and the user can still tick one by hand.
+
 Results follow the library. A `PHPhotoLibraryChangeObserver` drops every scanned asset that was removed or changed since the scan (a favourite added in the Photos app, an edit, a deletion), so a stale suggestion cannot be acted on. Changes that arrive while a scan runs are held back and applied when it finishes, so a photo favourited mid-scan is not pre-selected. When PhotoKit cannot describe a change, the results are cleared and a rescan is needed (mid-scan, the finished scan is discarded).
 
 `ReviewState` in CleanupCore owns the result and the selection, so the two cannot drift apart: the selection only holds ids that are shown, and a photo that just became the best of its group starts unselected (a deletion elsewhere in the group promotes it). Picking a best photo by hand stays possible. A group with fewer than two photos left disappears. When the best photo of a group is deleted, the best of the rest takes its place and is no longer suggested for removal, so a group never ends up with every copy suggested.
