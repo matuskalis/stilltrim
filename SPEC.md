@@ -80,7 +80,7 @@ File size comes from `PHAssetResource` through the key-value keys `fileSize` and
 
 1. Welcome: the promise in three lines, one button to grant access.
 2. Home: total reclaimable space, four category rows with count and size, scan progress.
-3. Review: thumbnail grid, tap to select, tap-hold for preview and "Keep". Similar shots show as groups with a "Best" mark. Screenshots sit under a heading per kind with a Select button. Bottom bar: "Delete N · X MB", and "Delete N above" once some ticked photos have been scrolled past.
+3. Review: thumbnail grid, tap to select, tap-hold for preview and "Keep". Similar shots show as groups with a "Best" mark. Screenshots sit under a heading per kind with a Select button. Bottom bar: "Delete N · X MB", and "Delete N above" once some ticked photos have been scrolled past. The selection mark is a 22 pt disc with a white ring, a dark scrim inside and a dark keyline outside, so it keeps 3:1 against any photo (`Contrast` tests in CleanupCore); selected adds the accent fill and a check and shrinks the photo to 90 percent, so the states differ in shape, not only colour. Haptics come from `sensoryFeedback` on the Review screen, driven by event counters: a light tick for one photo, a firmer impact for Select all or a section Select, a success when a delete completes.
 4. Done: space freed once Recently Deleted is emptied, with steps.
 5. Settings: privacy in plain words and how to verify it (airplane mode, iOS App Privacy Report), manage limited access, erase app data.
 

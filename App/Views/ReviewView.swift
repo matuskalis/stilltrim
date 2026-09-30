@@ -49,6 +49,9 @@ struct ReviewView: View {
     @Environment(AppModel.self) private var model
     @State private var preview: PreviewTarget?
     @State private var tracker = ScrollTracker()
+    @State private var selectTicks = 0
+    @State private var bulkSelects = 0
+    @State private var deletions = 0
 
     private let columns = [GridItem(.adaptive(minimum: 104), spacing: 2)]
 
@@ -56,8 +59,8 @@ struct ReviewView: View {
         ScrollViewReader { proxy in
             list
                 .safeAreaInset(edge: .bottom) {
-                    DeleteBar(category: category, tracker: tracker) { ids, anchor in
-                        await model.delete(ids: ids)
+                    DeleteBar(category: category, tracker: tracker, deleteAll: { await delete($0) }) { ids, anchor in
+                        await delete(ids)
                         // The photos above are gone, so everything below moves up. Go back to where the
                         // user was, or the next rows would slide past unseen.
                         await Task.yield()
@@ -65,6 +68,9 @@ struct ReviewView: View {
                     }
                 }
         }
+        .sensoryFeedback(.selection, trigger: selectTicks)
+        .sensoryFeedback(.impact(weight: .medium, intensity: 0.7), trigger: bulkSelects)
+        .sensoryFeedback(.success, trigger: deletions)
         .navigationTitle(category.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -82,6 +88,12 @@ struct ReviewView: View {
         } message: {
             Text(model.deletionError ?? "")
         }
+    }
+
+    /// A cancelled or failed delete leaves the ids selected, so only a real delete counts for the haptic.
+    private func delete(_ ids: Set<String>) async {
+        await model.delete(ids: ids)
+        if model.selection.isDisjoint(with: ids) { deletions += 1 }
     }
 
     private var list: some View {
@@ -170,6 +182,7 @@ struct ReviewView: View {
 
     /// Deselecting clears the whole section, including favourites and edited photos picked by hand.
     private func toggle(_ section: ReviewSection) {
+        bulkSelects += 1
         if isFullySelected(section) {
             model.deselect(ids: Set(section.items.map(\.id)))
         } else {
@@ -178,7 +191,10 @@ struct ReviewView: View {
     }
 
     private func cell(_ item: CleanupItem) -> some View {
-        Button { model.toggle(item.id) } label: {
+        Button {
+            selectTicks += 1
+            model.toggle(item.id)
+        } label: {
             PhotoCell(item: item, isSelected: model.selection.contains(item.id))
         }
         .buttonStyle(.plain)
@@ -214,6 +230,7 @@ struct ReviewView: View {
 
     /// Deselecting clears everything in this category, including photos picked by hand.
     private func toggleAll() {
+        bulkSelects += 1
         switch bulkAction {
         case .deselectAll: model.deselect(ids: Set(model.result?.items(in: category).map(\.id) ?? []))
         case .select: model.select(ids: selectableIDs)
@@ -225,6 +242,7 @@ struct ReviewView: View {
 private struct DeleteBar: View {
     let category: CleanupCategory
     let tracker: ScrollTracker
+    let deleteAll: (Set<String>) async -> Void
     /// Deletes the photos, then puts the list back at the photo it is given.
     let deleteAbove: (Set<String>, String?) async -> Void
     @Environment(AppModel.self) private var model
@@ -247,7 +265,7 @@ private struct DeleteBar: View {
                 .accessibilityIdentifier("delete-above")
             }
             Button {
-                Task { await model.delete(ids: ids) }
+                Task { await deleteAll(ids) }
             } label: {
                 Text(ids.isEmpty
                     ? "Select items to delete"
@@ -274,33 +292,47 @@ private struct PhotoCell: View {
     @State private var image: CGImage?
 
     var body: some View {
-        Color(.secondarySystemFill)
+        Color(.systemBackground)
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                if let image {
-                    Image(decorative: image, scale: 1)
-                        .resizable()
-                        .scaledToFill()
-                }
+                Color(.secondarySystemFill)
+                    .overlay {
+                        if let image {
+                            Image(decorative: image, scale: 1)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                    }
+                    .clipped()
+                    .scaleEffect(isSelected ? DesignTokens.Mark.selectedPhotoScale : 1)
             }
-            .clipped()
             .overlay(alignment: .topTrailing) { selectionMark }
             .overlay(alignment: .topLeading) { protectedMark }
             .overlay(alignment: .bottomLeading) { badge }
             .overlay(alignment: .bottomTrailing) { videoLabel }
-            .overlay { if isSelected { Rectangle().strokeBorder(Color.accentColor, lineWidth: 3) } }
             .task(id: item.id) { image = await model.thumbnails.image(for: item.id, side: 400) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 
+    /// A white ring between a dark disc and a dark keyline: 3:1 or better on any photo. Selected adds the
+    /// accent fill and a check, so the two states differ in shape and glyph, not colour alone.
     private var selectionMark: some View {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.white, isSelected ? Color.accentColor : Color.white.opacity(0.9))
-            .font(.title3)
-            .shadow(radius: 2)
+        let mark = DesignTokens.Mark.self
+        return Circle()
+            .fill(isSelected ? DesignTokens.accent : mark.disc)
+            .frame(width: mark.diameter, height: mark.diameter)
+            .overlay { Circle().strokeBorder(mark.ring, lineWidth: mark.ringWidth) }
+            .overlay {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(DesignTokens.onAccent)
+                }
+            }
+            .padding(mark.keylineWidth)
+            .background { Circle().fill(mark.keyline) }
             .padding(6)
     }
 
@@ -313,7 +345,8 @@ private struct PhotoCell: View {
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(.ultraThinMaterial, in: Capsule())
+            .foregroundStyle(DesignTokens.Pill.text)
+            .background(DesignTokens.Pill.scrim, in: Capsule())
             .padding(5)
         }
     }
@@ -340,7 +373,8 @@ private struct PhotoCell: View {
         .font(.caption2.weight(.semibold))
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(.ultraThinMaterial, in: Capsule())
+        .foregroundStyle(DesignTokens.Pill.text)
+        .background(DesignTokens.Pill.scrim, in: Capsule())
         .padding(5)
     }
 

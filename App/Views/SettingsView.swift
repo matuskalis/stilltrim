@@ -98,6 +98,7 @@ struct SettingsView: View {
                 }
                 Section {
                     Button("Erase app data", role: .destructive) { confirmErase = true }
+                        .foregroundStyle(DesignTokens.accent)
                 } footer: {
                     Text("Removes the scan cache and the list of photos you chose to keep. Your photos are not touched. Photos you kept can show up in the lists again.")
                 }
