@@ -19,7 +19,8 @@ Synthesis of the round described in `feature-brief.md`. The raw agent reports st
 3. Home and scan: a hero that says "to review" plus a scope line, a breakdown that works with one accent, one scan progress that never restarts, locked rows while a step runs.
 4. Screenshots: a "Select older than" menu per heading and a one-time-code chip (rule 4 unchanged), then the Kinds check (counts-only labelling on the phone) to measure real accuracy.
 5. Group layout: pairs and triples as large tiles, the contact-strip header, a consistent radius and spacing token set.
-6. Best-shot and explain-why: a reason line for Best, a guard when an overlaid copy is the larger file.
+6. Best-shot (measured, see the local best-shot report): rank by the bytes of the still only (today Live Photo video and RAW count as detail), let file size and sharpness vote only when their gap clears a margin and call the rest a "close call", add an eyes-open signal from face landmarks, show a reason line under the group. The 16 of 16 result holds with no new data.
+6b. Small fixes from the media-type audit: `delete` should report what vanished, not what was requested; a timeout for a stuck delete (ProRAW); cloud-only screenshots list at 0 bytes and are not counted.
 7. Motion: cut, settle, count (spec in the local motion report), after the haptics land.
 8. Localization prerequisite for Slovak: String Catalog and real plurals, then a native review.
 
@@ -28,7 +29,7 @@ Synthesis of the round described in `feature-brief.md`. The raw agent reports st
 - Does Apple's Duplicates album catch what identical-copy detection would? One hour on the owner's phone decides whether identical copies are built at all.
 - Scan time and memory for screenshots at 1,536 px; the cold start of the accurate text level.
 - Optimize Storage behaviour (cloud-only originals, sizes, Best bias).
-- Burst, Live Photo and Shared Library deletes (media-type audit still open).
+- Burst, Live Photo and Shared Library deletes: the default fetch returns only a burst's representative, so frames never group, and deleting a representative probably removes the whole stack (unverified). A 15 minute device checklist is in the local media-type report.
 - Instruments on a 3,000 pair list.
 
 ## Decisions for the owner (recommendation first)
