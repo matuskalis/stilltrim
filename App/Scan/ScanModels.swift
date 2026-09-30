@@ -36,6 +36,7 @@ extension ScreenshotKind {
         case .chat: "Chats"
         case .receipt: "Receipts and tickets"
         case .code: "Codes and barcodes"
+        case .oneTimeCode: "Verification codes"
         case .map: "Maps"
         case .web: "Web pages"
         case .social: "Social posts"

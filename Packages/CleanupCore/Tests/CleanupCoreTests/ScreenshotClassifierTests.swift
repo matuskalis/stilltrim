@@ -61,12 +61,12 @@ import Testing
         #expect(ScreenshotClassifier.classify(ticket) == .receipt)
     }
 
-    @Test func aVerificationCodeMessageIsACode() {
+    @Test func aVerificationCodeMessageIsAOneTimeCode() {
         let otp = features([
             line("Your verification code is", y: 0.4),
             line("482913", x: 0.3...0.7, y: 0.45),
         ])
-        #expect(ScreenshotClassifier.classify(otp) == .code)
+        #expect(ScreenshotClassifier.classify(otp) == .oneTimeCode)
     }
 
     @Test func distancesAndDirectionsMakeAMap() {
