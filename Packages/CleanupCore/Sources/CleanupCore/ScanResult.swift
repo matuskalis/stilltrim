@@ -14,10 +14,16 @@ public struct CleanupItem: Identifiable, Sendable, Hashable {
     public let badge: String?
     public let screenshotKind: ScreenshotKind?
     public var isKeeper: Bool
+    public let isFavorite: Bool
+    public let isEdited: Bool
+
+    /// A favourite or an edited photo: a bulk action never selects it, the user can still tick it by hand.
+    public var isProtected: Bool { isFavorite || isEdited }
 
     public init(
         id: String, byteSize: Int64, creationDate: Date, duration: TimeInterval? = nil,
-        badge: String? = nil, screenshotKind: ScreenshotKind? = nil, isKeeper: Bool = false
+        badge: String? = nil, screenshotKind: ScreenshotKind? = nil, isKeeper: Bool = false,
+        isFavorite: Bool = false, isEdited: Bool = false
     ) {
         self.id = id
         self.byteSize = byteSize
@@ -26,6 +32,8 @@ public struct CleanupItem: Identifiable, Sendable, Hashable {
         self.badge = badge
         self.screenshotKind = screenshotKind
         self.isKeeper = isKeeper
+        self.isFavorite = isFavorite
+        self.isEdited = isEdited
     }
 }
 
@@ -37,6 +45,11 @@ public struct ScreenshotSection: Identifiable, Sendable, Hashable {
     public var id: String { kind.rawValue }
 
     public var byteSize: Int64 { items.reduce(0) { $0 + $1.byteSize } }
+
+    /// What this heading's Select button ticks: everything except favourites and edited photos.
+    public var bulkSelectableIDs: Set<String> { Set(items.filter { !$0.isProtected }.map(\.id)) }
+
+    public var protectedCountLeftOut: Int { items.filter(\.isProtected).count }
 }
 
 public struct SimilarGroup: Identifiable, Sendable, Hashable {
@@ -174,6 +187,18 @@ public struct ScanResult: Sendable {
     /// The non-best photos of every similar group, minus favourites and edited photos.
     public var suggestedSelection: Set<String> {
         similarGroups.reduce(into: Set<String>()) { $0.formUnion($1.suggestedRemovalIDs) }
+    }
+
+    /// What "Select all" ticks. Similar groups: the suggestion. Every other category: everything except
+    /// favourites and edited photos.
+    public func bulkSelectableIDs(in category: CleanupCategory) -> Set<String> {
+        category == .similar ? suggestedSelection : Set(items(in: category).filter { !$0.isProtected }.map(\.id))
+    }
+
+    /// Favourites and edited photos "Select all" leaves out. Zero for similar groups, whose suggestion
+    /// already leaves the best photo and the protected ones unticked.
+    public func protectedCountLeftOut(in category: CleanupCategory) -> Int {
+        category == .similar ? 0 : items(in: category).filter(\.isProtected).count
     }
 
     /// The best photo of every similar group.

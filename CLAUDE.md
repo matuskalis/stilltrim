@@ -6,7 +6,7 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 
 - Nothing leaves the phone. No networking code, no third-party code, no analytics. `scripts/check-no-network.sh` is a tripwire for it (not a proof) and runs inside `scripts/verify.sh`. The real check is a device in airplane mode plus the iOS App Privacy Report. When StoreKit joins for a paywall, allow it in that script on purpose and nowhere else.
 - `isNetworkAccessAllowed` is always false. The app never downloads from iCloud.
-- Deleting goes only through `PHAssetChangeRequest.deleteAssets`, so iOS shows its own confirmation. Nothing is pre-selected except the non-best photos of a similar group, never favourites or edited photos.
+- Deleting goes only through `PHAssetChangeRequest.deleteAssets`, so iOS shows its own confirmation. Nothing is pre-selected except the non-best photos of a similar group, never favourites or edited photos. Bulk selection ("Select all", a section Select) also skips favourites and edited photos outside similar groups; the user can still tick one by hand.
 - Result and selection change only through `ReviewState` (CleanupCore), so the selection never holds an id that is not shown and a freshly promoted best photo starts unselected. Rules about removing, promoting and suggesting live in `ScanResult.swift` and `ReviewState.swift`, with tests.
 - Every threshold comes from a measurement. Change one together with `CalibrationTests`: `scripts/fetch-fixtures.sh`, then `CLEANUP_FIXTURES=$PWD/.fixtures swift test` inside `Packages/CleanupCore`.
 - Never press Test with a phone as the destination. The `Stilltrim` scheme has no tests; the UI tests are in `Stilltrim-UITests`, delete seeded photos, and skip themselves outside a simulator.

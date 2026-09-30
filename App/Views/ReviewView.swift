@@ -39,8 +39,9 @@ private struct ReviewSection: Identifiable {
     let id: String
     let title: String?
     let items: [CleanupItem]
-    /// Similar groups come with their suggestions already selected, so they get no select button.
-    let canSelectAll: Bool
+    /// What the select button ticks. Empty for similar groups, which come with their suggestions already
+    /// selected, and when every item is a favourite or an edited photo.
+    let bulkSelectableIDs: Set<String>
 }
 
 struct ReviewView: View {
@@ -89,6 +90,7 @@ struct ReviewView: View {
                     ContentUnavailableView("Nothing here", systemImage: category.symbol)
                         .padding(.top, 80)
                 } else {
+                    leftOutCaption(result.protectedCountLeftOut(in: category))
                     LazyVGrid(columns: columns, spacing: 2, pinnedViews: [.sectionHeaders]) {
                         ForEach(sections(of: result)) { section in
                             Section {
@@ -106,6 +108,19 @@ struct ReviewView: View {
         .coordinateSpace(.named(scrollSpace))
     }
 
+    @ViewBuilder private func leftOutCaption(_ count: Int) -> some View {
+        if count > 0 {
+            Text(count == 1
+                ? "1 favourite or edited photo was left out. Tap it to select it."
+                : "\(count.formatted()) favourites or edited photos were left out. Tap one to select it.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+        }
+    }
+
     /// The same order `ScanResult.items(in:)` uses, which is what "above" is measured against.
     private func sections(of result: ScanResult) -> [ReviewSection] {
         switch category {
@@ -114,7 +129,7 @@ struct ReviewView: View {
                 ReviewSection(
                     id: "group-\(group.id)",
                     title: "\(group.items.count) similar · \(group.reclaimableBytes.formatted(.byteCount(style: .file))) to gain",
-                    items: group.items, canSelectAll: false
+                    items: group.items, bulkSelectableIDs: []
                 )
             }
         case .screenshots:
@@ -122,11 +137,11 @@ struct ReviewView: View {
                 ReviewSection(
                     id: "kind-\(section.id)",
                     title: "\(section.kind.title) · \(section.items.count.formatted()) · \(section.byteSize.formatted(.byteCount(style: .file)))",
-                    items: section.items, canSelectAll: true
+                    items: section.items, bulkSelectableIDs: section.bulkSelectableIDs
                 )
             }
         default:
-            [ReviewSection(id: "category-\(category.id)", title: nil, items: result.items(in: category), canSelectAll: false)]
+            [ReviewSection(id: "category-\(category.id)", title: nil, items: result.items(in: category), bulkSelectableIDs: [])]
         }
     }
 
@@ -135,7 +150,7 @@ struct ReviewView: View {
             HStack {
                 Text(title)
                 Spacer()
-                if section.canSelectAll {
+                if !section.bulkSelectableIDs.isEmpty {
                     Button(isFullySelected(section) ? "Deselect" : "Select") { toggle(section) }
                         .accessibilityIdentifier("select-\(section.id)")
                 }
@@ -149,12 +164,16 @@ struct ReviewView: View {
     }
 
     private func isFullySelected(_ section: ReviewSection) -> Bool {
-        Set(section.items.map(\.id)).isSubset(of: model.selection)
+        section.bulkSelectableIDs.isSubset(of: model.selection)
     }
 
+    /// Deselecting clears the whole section, including favourites and edited photos picked by hand.
     private func toggle(_ section: ReviewSection) {
-        let ids = Set(section.items.map(\.id))
-        if isFullySelected(section) { model.deselect(ids: ids) } else { model.select(ids: ids) }
+        if isFullySelected(section) {
+            model.deselect(ids: Set(section.items.map(\.id)))
+        } else {
+            model.select(ids: section.bulkSelectableIDs)
+        }
     }
 
     private func cell(_ item: CleanupItem) -> some View {
@@ -180,8 +199,7 @@ struct ReviewView: View {
     }
 
     private var selectableIDs: Set<String> {
-        guard let result = model.result else { return [] }
-        return category == .similar ? result.suggestedSelection : Set(result.items(in: category).map(\.id))
+        model.result?.bulkSelectableIDs(in: category) ?? []
     }
 
     private var allSelectableSelected: Bool {
@@ -266,6 +284,7 @@ private struct PhotoCell: View {
             }
             .clipped()
             .overlay(alignment: .topTrailing) { selectionMark }
+            .overlay(alignment: .topLeading) { protectedMark }
             .overlay(alignment: .bottomLeading) { badge }
             .overlay(alignment: .bottomTrailing) { videoLabel }
             .overlay { if isSelected { Rectangle().strokeBorder(Color.accentColor, lineWidth: 3) } }
@@ -282,6 +301,20 @@ private struct PhotoCell: View {
             .font(.title3)
             .shadow(radius: 2)
             .padding(6)
+    }
+
+    @ViewBuilder private var protectedMark: some View {
+        if item.isProtected {
+            HStack(spacing: 3) {
+                if item.isFavorite { Image(systemName: "heart.fill") }
+                if item.isEdited { Image(systemName: "pencil") }
+            }
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(.ultraThinMaterial, in: Capsule())
+            .padding(5)
+        }
     }
 
     @ViewBuilder private var badge: some View {
@@ -313,6 +346,8 @@ private struct PhotoCell: View {
     private var accessibilityLabel: String {
         var parts = [item.creationDate.formatted(date: .abbreviated, time: .shortened)]
         if item.isKeeper { parts.append("best shot") }
+        if item.isFavorite { parts.append("favourite") }
+        if item.isEdited { parts.append("edited") }
         if let kind = item.screenshotKind { parts.append(kind.title) }
         if let badge = item.badge { parts.append(badge) }
         parts.append(item.byteSize.formatted(.byteCount(style: .file)))
