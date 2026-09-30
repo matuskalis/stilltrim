@@ -9,8 +9,10 @@ enum ScanError: Error {
 struct ScanPipeline: Sendable {
     static let bigVideoBytes: Int64 = 50_000_000
     static let thumbnailSide: CGFloat = 512
-    /// Small print on a phone screenshot needs more pixels than a similarity check does.
-    static let screenshotSide: CGFloat = 1_024
+    /// Small print on a phone screenshot needs more pixels than a similarity check does. At 1,024 px the fast
+    /// reader lost the colon in clock times and the short lines of dark chats. At 1,536 px it read them, for
+    /// about the same time (measured on a Mac, not yet on a phone).
+    static let screenshotSide: CGFloat = 1_536
     static let maxConcurrentAnalyses = 4
     private static let sizingBatch = 500
     private static let saveEvery = 1_500
