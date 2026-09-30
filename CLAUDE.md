@@ -18,6 +18,7 @@ iPhone app that finds junk in the photo library (screenshots, similar shots, blu
 - `xcodegen generate` builds the Xcode project from `project.yml`. The `.xcodeproj` is not committed.
 - `scripts/verify.sh` runs package tests, the simulator build and the privacy guard, then prints READY or NOT-READY. `--ui` adds the UI tests (scheme `Stilltrim-UITests`).
 - `scripts/render-icon.sh` renders `Design/AppIcon.svg` into the asset catalog. Releases: push a tag `v0.1.0` and `.github/workflows/release.yml` builds the unsigned IPA.
+- `scripts/test-tripwire.sh` plants violations in a temp copy of the repo and checks that `scripts/check-no-network.sh` fails on each; run it after editing that script.
 - `cd Packages/CleanupCore && swift test` is the fastest loop for the pure logic.
 - `scripts/classify-folder.sh <folder> [--dump]` classifies every image in a folder with the app's Vision classifier on the Mac (AirDrop real screenshots to try it); `--dump` also prints the recognised text.
 - `scripts/seed-simulator.sh <UDID>` fills a simulator library with near-duplicates, blurry and blank frames, screenshots and a 78 MB video. `scripts/seed-bulk.sh <UDID> 2000` adds a scale set.
