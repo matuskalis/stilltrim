@@ -64,6 +64,63 @@ expect c19_sdk_dependency         FAIL 'add_project_line "      - sdk: Network.f
 expect c20_framework_dependency   FAIL 'add_project_line "      - framework: Vendor.xcframework" "$DEPENDENCY_ANCHOR"'
 expect c21_model_file             FAIL 'mkdir -p App/Models && printf x > App/Models/Clf.mlmodelc'
 expect c6_URL_init_split_literal  PASS 'printf "import Foundation\nlet u = URL.init(string: \"ht\" + \"tps://example.com\")\n" > App/Evil.swift' known-gap
+expect c22_second_import_after_semicolon FAIL 'printf "import Foundation; import MapKit\n" > App/Evil.swift'
+expect c23_import_after_comment   FAIL 'printf "/* x */ import MapKit\n" > App/Evil.swift'
+expect c24_dlsym                  FAIL 'printf "import Foundation\nlet p = dlsym(nil, \"connect\")\n" > App/Evil.swift'
+expect c25_getStreamsToHost       FAIL 'printf "import Foundation\nfunc f() { Stream.getStreamsToHost(withName: \"h\", port: 1, inputStream: nil, outputStream: nil) }\n" > App/Evil.swift'
+expect c26_flow_style_url_package FAIL 'add_project_line "  Foo: {url: \"https://example.com/foo.git\", from: 1.0.0}" "$PACKAGES_ANCHOR"'
+expect c27_quoted_key             FAIL 'add_project_line "      - \"github\": someone/somepkg" "$DEPENDENCY_ANCHOR"'
+expect c28_flow_sources_path      FAIL 'add_project_line "    sources: [{path: ../evil}]" "    platform: iOS"'
+
+# Built-app check: fixture bundles with a binary built by swiftc, asserted by exit code.
+FIXTURES="$TMP/fixtures"
+mkdir -p "$FIXTURES"
+
+build_fixture() {
+  local name="$1" source="$2"
+  mkdir -p "$FIXTURES/$name.app"
+  printf '%s\n' "$source" > "$FIXTURES/$name.swift"
+  if ! swiftc -O -parse-as-library -emit-library "$FIXTURES/$name.swift" -o "$FIXTURES/$name.app/Stilltrim" >/dev/null 2>&1; then
+    echo "FAIL  could not build fixture $name with swiftc"
+    surprises=$((surprises + 1))
+  fi
+}
+
+# expect_app <name> <expected exit code> <app folder>
+expect_app() {
+  local name="$1" expected="$2" app="$3" actual
+  cases=$((cases + 1))
+  "$SRC/scripts/check-built-app.sh" "$app" >/dev/null 2>&1
+  actual=$?
+  if [ "$actual" = "$expected" ]; then
+    echo "PASS  $name (check-built-app exit $actual, expected $expected)"
+  else
+    echo "FAIL  $name (check-built-app exit $actual, expected $expected)"
+    surprises=$((surprises + 1))
+  fi
+}
+
+build_fixture clean 'import Foundation
+public func f() -> Int { "a".count }'
+build_fixture socket 'import Foundation
+public func f() -> Int32 { socket(AF_INET, SOCK_STREAM, 0) }'
+build_fixture cfnetwork 'import Foundation
+public func f() -> AnyObject { URLSession.shared }'
+build_fixture outside 'import MapKit
+public func f() -> AnyObject { MKMapView() }'
+
+cp -R "$FIXTURES/clean.app" "$FIXTURES/unreadable.app"
+printf 'not a binary' > "$FIXTURES/unreadable.app/Stilltrim"
+cp -R "$FIXTURES/clean.app" "$FIXTURES/embedded.app"
+mkdir -p "$FIXTURES/embedded.app/Frameworks/Vendor.framework"
+
+expect_app b1_clean_app_passes          0 "$FIXTURES/clean.app"
+expect_app b2_socket_symbol             1 "$FIXTURES/socket.app"
+expect_app b3_links_CFNetwork           1 "$FIXTURES/cfnetwork.app"
+expect_app b4_library_outside_allowlist 1 "$FIXTURES/outside.app"
+expect_app b5_unreadable_binary         1 "$FIXTURES/unreadable.app"
+expect_app b6_embedded_frameworks       1 "$FIXTURES/embedded.app"
+expect_app b7_missing_app               1 "$FIXTURES/nothing.app"
 
 echo
 if [ "$surprises" -eq 0 ]; then

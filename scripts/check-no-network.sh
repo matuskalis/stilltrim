@@ -19,10 +19,10 @@ code_matching() {
 }
 
 # 1. No third-party dependencies: only local path packages, no binaries, no linked frameworks.
-deps=$(grep -nE '^\s*(-\s+)?(url|github|framework|sdk|xcframework|carthage):' project.yml || true)
+deps=$(grep -nE "(^|[[:space:]{,])[\"']?(url|github|framework|sdk|xcframework|carthage)[\"']?[[:space:]]*:" project.yml || true)
 deps+=$(grep -rnE '\.package\(url:|\.binaryTarget|\.xcframework' Packages/*/Package.swift 2>/dev/null || true)
 deps+=$(ls Podfile Cartfile 2>/dev/null || true)
-outside=$(grep -nE '^\s+(-\s+)?path:\s' project.yml | grep -vE 'path:\s+(App|App/Info\.plist|UITests|Packages/[A-Za-z0-9]+)\s*$' || true)
+outside=$(grep -nE "(^|[[:space:]{,])[\"']?path[\"']?[[:space:]]*:[[:space:]]" project.yml | grep -vE 'path:\s+(App|App/Info\.plist|UITests|Packages/[A-Za-z0-9]+)\s*$' || true)
 if [ -n "$deps$outside" ]; then
   fail "third-party dependency, binary or linked framework declared:"; echo "$deps$outside"
 else
@@ -32,7 +32,7 @@ fi
 # 2. No networking, web, ads, tracking or analytics APIs in the source. The last five are OS calls that make
 # the system fetch data for the app (embedding assets, a cloud language model, resource upload, downloadable
 # Vision assets), which no networking symbol would show.
-DENY='requestAssets|PrivateCloudComputeLanguageModel|PHAssetResourceUploadJob|downloadAssets|DownloadableAssetsRequest|NSURLSession|URLComponents|NSURLComponents|NSURL\b|dataRepresentation|resolvingBookmarkData|dlopen|NSClassFromString|URLSession|URLRequest|URLConnection|NWConnection|NWPathMonitor|NWListener|CFNetwork|CFSocket|CFStream|import Network|import WebKit|WKWebView|SFSafariViewController|import SafariServices|ASWebAuthenticationSession|import AdSupport|ASIdentifierManager|AppTrackingTransparency|ATTrackingManager|import StoreKit|import CloudKit|import MessageUI|import Firebase|import Sentry|import Crashlytics|import Amplitude|import Mixpanel|import Segment|AsyncImage|NSUbiquitousKeyValueStore|NSBundleResourceRequest|UIPasteboard|ShareLink|UIActivityViewController|\bgetaddrinfo\b|\bgethostbyname\b|\bsocket\(|https?://'
+DENY='requestAssets|PrivateCloudComputeLanguageModel|PHAssetResourceUploadJob|downloadAssets|DownloadableAssetsRequest|NSURLSession|URLComponents|NSURLComponents|NSURL\b|dataRepresentation|resolvingBookmarkData|dlopen|dlsym|getStreamsToHost|NSClassFromString|URLSession|URLRequest|URLConnection|NWConnection|NWPathMonitor|NWListener|CFNetwork|CFSocket|CFStream|import Network|import WebKit|WKWebView|SFSafariViewController|import SafariServices|ASWebAuthenticationSession|import AdSupport|ASIdentifierManager|AppTrackingTransparency|ATTrackingManager|import StoreKit|import CloudKit|import MessageUI|import Firebase|import Sentry|import Crashlytics|import Amplitude|import Mixpanel|import Segment|AsyncImage|NSUbiquitousKeyValueStore|NSBundleResourceRequest|UIPasteboard|ShareLink|UIActivityViewController|\bgetaddrinfo\b|\bgethostbyname\b|\bsocket\(|https?://'
 hits=$(code_matching "$DENY")
 if [ -n "$hits" ]; then
   fail "network, web, ad or analytics API in source:"; echo "$hits"
@@ -41,8 +41,10 @@ else
 fi
 
 # 2a. Import allow-list: a new framework is a deliberate edit of this list.
-ALLOWED_IMPORTS='Foundation|SwiftUI|UIKit|Photos|PhotosUI|Vision|CoreGraphics|Accelerate|Observation|os|CleanupCore'
-hits=$(grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+' $SOURCES | sed -E 's/^([^:]+:[0-9]+):[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(struct|class|enum|protocol|func|var|let|typealias)?[[:space:]]*([A-Za-z_][A-Za-z0-9_]*).*/\4 \1/' | awk -v allow="^($ALLOWED_IMPORTS)$" '$1 !~ allow' || true)
+# Keep in step with ALLOW_LIBS in scripts/check-built-app.sh (the libraries the built binary may bind).
+ALLOWED_IMPORTS='Foundation|SwiftUI|UIKit|Photos|PhotosUI|Vision|CoreGraphics|Accelerate|Observation|os|CleanupCore|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers'
+# An import at the start of a line, or after a ";" or a "*/" on the same line.
+hits=$(grep -rnE --include='*.swift' '(^|;|\*/)[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+' $SOURCES | perl -ne 'my ($where, $code) = /^([^:]+:\d+):(.*)$/s or next; while ($code =~ /(?:^|;|\*\/)\s*(?:@\w+\s+)*import\s+(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(\w+)/g) { print "$1 $where\n" }' | awk -v allow="^($ALLOWED_IMPORTS)$" '$1 !~ allow' || true)
 if [ -n "$hits" ]; then
   fail "import of a framework that is not on the allow-list:"; echo "$hits"
 else

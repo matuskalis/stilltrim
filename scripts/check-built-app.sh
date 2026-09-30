@@ -8,8 +8,9 @@ set -uo pipefail
 
 app="${1:?usage: check-built-app.sh <path to .app>}"
 DENY_LINK='Network\.framework|CFNetwork\.framework|WebKit\.framework|SafariServices\.framework|AdSupport\.framework|AppTrackingTransparency\.framework|StoreKit\.framework|CloudKit\.framework|MessageUI\.framework'
-# Libraries a binary may bind symbols from. A new framework is a deliberate edit of this list.
-ALLOW_LIBS='^(SwiftUI|Foundation|Photos|UIKit|CoreGraphics|Vision|Accelerate|CoreFoundation|libobjc|libSystem|libswift.*|libc\+\+.*|DeveloperToolsSupport)$'
+# Libraries a binary may bind symbols from: local Apple frameworks only, no networking-capable one. A new framework is a
+# deliberate edit of this list. Keep it in step with ALLOWED_IMPORTS in scripts/check-no-network.sh.
+ALLOW_LIBS='^(SwiftUI|Foundation|Photos|UIKit|CoreGraphics|Vision|Accelerate|CoreFoundation|PhotosUI|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers|libobjc|libSystem|libswift.*|libc\+\+.*|DeveloperToolsSupport)$'
 DENY_SYMS='_OBJC_CLASS_\$_(NSURLSession|NSURLConnection|NSURLRequest|NSMutableURLRequest|NSURLDownload|NSNetService|NSNetServiceBrowser|NSUbiquitousKeyValueStore|WKWebView|SFSafariViewController|UIPasteboard|UIActivityViewController)$|\$s7SwiftUI10AsyncImage|^_(socket|connect|bind|listen|accept|sendto|recvfrom|getaddrinfo|gethostbyname|CFStreamCreatePairWithSocketToHost|CFHostCreateWithName|CFSocketCreate|nw_connection_create|nw_listener_create)$'
 failed=0
 
@@ -50,7 +51,7 @@ for binary in "$app/Stilltrim" "$app/Stilltrim.debug.dylib" "$app/__preview.dyli
   fi
   bad_libraries=$(echo "$symbols" | sed -n 's/.*(from \(.*\))$/\1/p' | sort -u | grep -vE "$ALLOW_LIBS" || true)
   if [ -n "$bad_libraries" ]; then
-    echo "error: $(basename "$binary") binds symbols from a library that is not on the allow-list: $(echo $bad_libraries)"
+    echo "error: $(basename "$binary") binds symbols from a library that is not on the allow-list: $(echo $bad_libraries). If it is local and deliberate, add it to ALLOW_LIBS in scripts/check-built-app.sh"
     failed=1
   fi
   bad_symbols=$(echo "$symbols" | sed -E 's/^ *\(undefined\) (weak )?external ([^ ]+).*/\2/' | grep -E "$DENY_SYMS" | sort -u || true)
