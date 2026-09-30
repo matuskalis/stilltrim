@@ -105,7 +105,7 @@ The second checked those fixes and found 3 more: a photo promoted to best after 
 
 1. Look up sizes only for candidates (screenshots, videos, group members, flagged photos), not for every asset.
 2. Exact duplicates anywhere in the library (same pixel size and byte size, confirmed by feature print). Needs sizes for all photos, so it waits for step 1.
-3. Real-device pass on a large library (Settings, About shows which similarity check is active): speed, iCloud behaviour, Vision similarity quality, and whether the app's own large batch delete reaches the change observer as a non-incremental change (that would clear the results after a successful delete, which is safe but should not happen). Needs an Apple ID signed in to Xcode.
+3. Real-device pass on a large library. First run done on 30 Sep 2026: installed on a physical iPhone with `scripts/install-on-iphone.sh`, scanned, and the owner reports it works well. Still to record: scan time and library size, false alarms in Blurry and dark, whether the Best picks are right, iCloud Optimize Storage behaviour, and whether the app's own large batch delete reaches the change observer as a non-incremental change (that would clear the results after a successful delete, which is safe but should not happen). Settings, About shows which similarity check is active.
 4. Later, decided but not built: exact duplicates anywhere, smarter screenshots (label only), aesthetics score as a tie-break behind `#available(iOS 18)`, user-album protection, a strictness control, quick scan first. Ranking and effort: `docs/research/features-and-pipeline.md`.
 
 ## Out of scope for v1

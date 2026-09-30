@@ -29,7 +29,7 @@ fi
 device="${1:-}"
 if [ -z "$device" ]; then
   device=$(xcrun devicectl list devices 2>/dev/null \
-    | awk '/iPhone/ && /available \(paired\)/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) { print $i; exit } }')
+    | awk '/iPhone/ && /(available \(paired\)|connected)/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) { print $i; exit } }')
 fi
 if [ -z "$device" ]; then
   echo "No reachable paired iPhone. Unlock it and put it on this Mac's network, or plug it in." >&2
