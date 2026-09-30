@@ -34,7 +34,7 @@ You need a Mac with Xcode 26 or 27 (built and tested with 26.1.1, 26.6 and 27.0)
 4. `xcodegen generate`, open `Stilltrim.xcodeproj`, choose your iPhone and press Run.
 5. The first launch stops with an untrusted developer message. Trust yourself under Settings, General, VPN & Device Management, then press Run again.
 
-With a free Apple ID the app stops launching after 7 days (build again), and one phone holds 3 such apps.
+With a free Apple ID the app stops launching after 7 days (build again), and one phone holds 3 such apps. `scripts/install-on-iphone.sh` builds an optimised copy, installs it on a paired iPhone and launches it from the command line, which also renews the 7 days.
 
 Do not press Test with your phone selected. The `Stilltrim` scheme has no tests for that reason. The UI tests are in the `Stilltrim-UITests` scheme, they delete photos, and they skip themselves anywhere but a simulator.
 
