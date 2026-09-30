@@ -68,7 +68,7 @@ Scan pipeline (`App/Scan/ScanPipeline.swift`), in order:
 1. List the library (`PhotoLibraryService.loadAssets`), skipping the keep list.
 2. Sizing: bytes per asset from `PHAssetResource` through the undocumented keys `fileSize` and `locallyAvailable` (checked with `responds(to:)`), plus an "edited" flag from resource types. About 4.3 ms per asset.
 3. Photo analysis: a 512 px thumbnail (network off, exact), 4 at a time. Quality metrics and a Vision feature print (revision 2, 768 values, half precision in the cache).
-4. Screenshot reading: a 1,024 px thumbnail. Vision text recognition (fast level, no language correction), barcode detection and scene labels. `ScreenshotClassifier` turns that into a kind. Only the kind label is cached, never the text.
+4. Screenshot reading: a 1,536 px thumbnail. Vision text recognition (fast level, no language correction), barcode detection and scene labels. `ScreenshotClassifier` turns that into a kind. Only the kind label is cached, never the text.
 5. Grouping: leader clustering over creation order, at most 30 neighbours within 10 minutes, distance threshold 0.45.
 6. Low quality list, then the screenshot order is frozen once (`ScanResult.arrangeScreenshots`).
 
@@ -143,6 +143,22 @@ From `docs/research/features-and-pipeline.md` (29 Sep 2026) and this round:
 - Privacy is expected to matter more to users than to any single reader, so the promise stays and the research should measure it.
 - Wants a large research and brainstorm round after this: features, evidence, ranking.
 
+### A9. Design principles
+
+Design is a first-class goal of this round, next to function. The owner wants the app to look and feel as good as it works.
+
+- Fitness to the subject. The look comes from what the app does: going through a pile of frames and marking the ones to cut. Distinctiveness is a welcome side effect, never the brief.
+- Start from real assets: the contact-sheet icon (`Design/AppIcon.svg`, a 3 by 3 grid of grey frames with one circled in red), the red accent, and the words the app already uses (Best, Keep, Select, frames).
+- Native first: SF and system materials, SF Symbols, system navigation and sheets, Dynamic Type, dark mode, and the newest OS design language (Liquid Glass on iOS 26 and later) where it fits, behind `#available`, with the iOS 17 look as the floor.
+- Avoid the current AI-design defaults: a cream background with a serif and a terracotta accent, Inter or Space Grotesk, hairline rules everywhere, rounded cards with a coloured accent bar, emoji as markers, gradient hero blobs.
+- Name placeholders as placeholders. The accent hex values (#D12E1F light, #FF5B47 dark) and any colour a proposal invents stay "placeholder until judged on a device".
+- Accessibility is part of the design: text contrast at least 4.5 to 1, non-text UI at least 3 to 1 (the selection mark over any photo included), Dynamic Type up to the accessibility sizes, reduce motion.
+- One accent colour. Red means "this goes": the selection mark and the Delete button share it.
+- Every proposal states what it costs in SwiftUI on an iOS 17 floor and what it does to scroll performance (the review grid is sensitive, see A5).
+- A website or landing page is a separate project and out of scope in this repository.
+
+Real screenshots of every screen, light and dark, sit in `docs/research/design/screens/` (local files, not in the public repository). File names: `<light|dark>-<number>-<screen>.png`.
+
 ## Part B. Scoring and templates
 
 ### B1. Rubric (score every idea 1 to 5, 5 is best)
@@ -157,6 +173,8 @@ From `docs/research/features-and-pipeline.md` (29 Sep 2026) and this round:
 - Differentiation: does a competitor already do it well.
 
 Write the total as a plain sum out of 40, and say which score you are least sure of.
+
+Also give a separate Design score, 1 to 5, outside the total: how much the idea improves how the app looks and feels. Five means a visible step up on a main screen.
 
 ### B2. Idea card
 
@@ -306,6 +324,29 @@ These are starting points, not decisions. A mission may add ideas. IDs are stabl
 - G05 Cleanup challenges (avoid dark patterns).
 - G06 A Mac tool that runs the same analyzer on a folder of screenshots, to tune the rules with real data (built: `scripts/classify-folder.sh`).
 - G07 Mirror Apple's own Utilities albums, if PhotoKit exposes them.
+
+### H. Design and craft
+
+- H01 The contact-sheet idea carried into the UI: frame numbers, a film-edge rhythm, a frame border on cells, the red circle from the icon as the selection mark (like a grease pencil on a contact sheet).
+- H02 A selection mark that keeps 3 to 1 contrast on any photo (an inset tile or a two-ring mark), replacing the plain checkmark.
+- H03 A Home hero that shows the product and not only a number: a strip of frames, a storage bar, or a stacked space view.
+- H04 A scan screen with character: progress stated as what is being looked at, with a live count of what was found.
+- H05 A receipt after deleting (what went, how much, what happens next) instead of a full sheet every time.
+- H06 Haptics: a light tick on select, a firm one on delete, a soft one when a batch is done.
+- H07 Motion: frames leaving like cut film, counting numbers, calm transitions between Home and Review, reduce motion respected.
+- H08 Section headers for kinds with SF Symbols and counts, consistent with the Home rows.
+- H09 Type: a clear scale from system fonts, rounded digits for numbers, no more than three sizes on a screen.
+- H10 Dark mode designed as its own thing, not an inverted light mode.
+- H11 The accent hex values judged on a device in light and dark, with contrast numbers.
+- H12 Liquid Glass (iOS 26 and later) for the bottom bar and buttons, behind `#available`, with the iOS 17 look as the fallback.
+- H13 A Welcome screen that makes the promise a design moment: a full-width primary button, a real hierarchy, one strong visual.
+- H14 Empty, error and limited-access states with the same care as the main path.
+- H15 An app icon with dark and tinted variants (iOS 18 and later), and store and README visuals that match.
+- H16 A widget and a Lock Screen control design, if C02 or C05 ever ship.
+- H17 One corner radius, one spacing grid and one symbol weight across all screens.
+- H18 A tasteful "space freed" moment after a clean, with no confetti cliche.
+- H19 Icons for the kinds (chat, receipt, code, map, web, social, document, picture, recording, mix) as SF Symbols, tested for legibility at small sizes.
+- H20 A design token file (colours, spacing, radii, type) so the look can be tuned in one place.
 
 ## Part D. Missions
 
@@ -624,6 +665,96 @@ Questions:
 
 Deliverable: a design with function signatures for CleanupCore, test cases, the UI proposal, and an idea card.
 
+### M23. Design audit of the current app (`M23-design-audit`)
+
+Why: the owner wants a big investment in design. Start from what is on screen today.
+
+Read first: Part A9. Look at every image in `docs/research/design/screens/` (light and dark). Then read `App/Views/WelcomeView.swift`, `HomeView.swift`, `ReviewView.swift`, `SettingsView.swift`, `App/Assets.xcassets`, `Design/AppIcon.svg`, `docs/research/identity.md`, and `docs/research/agents/M06-review-ux.md` if it exists (it found that the selection border is under 3 to 1 contrast on most mid-tone photos).
+
+Questions:
+1. For each screen: what works, and what looks default, unfinished or off. Name concrete items with file and line: hierarchy, alignment, spacing, type, colour and contrast in light and dark, density, affordances, states.
+2. Consistency across screens: corner radii, paddings, symbol weights, button styles, materials.
+3. Where does the UI express the product (contact sheet, trimming, stillness), and where is it generic?
+4. The iOS 26 and 27 design language: what the app gets for free when built with the new SDK, what looks dated next to it, what to adopt behind `#available` with the iOS 17 look as the floor.
+5. Accessibility as seen in the screenshots: contrast, tap targets, Dynamic Type risks.
+6. A ranked fix list: quick wins (under 1 hour each), medium (under 1 day), big (more).
+
+Deliverable: per-screen findings, cross-cutting issues, the ranked fix list with file references and effort, and 6 idea cards from the H list (scored, with the Design score).
+
+Done when: every screenshot is discussed and every finding names the screen and, where it applies, the source line.
+
+### M24. Visual direction concepts (`M24-direction`)
+
+Why: choose a look that fits the subject.
+
+Read first: Part A9 (the rules are binding), the screenshots in `docs/research/design/screens/`, `Design/AppIcon.svg`, `docs/research/identity.md`, `docs/research/agents/M23-design-audit.md` if it exists.
+
+Task: propose three distinct visual directions for the app, each derived from the subject (contact sheets, film, the darkroom, trimming, stillness or something you find in the research). For each:
+- The idea in a paragraph and the words it uses in the UI.
+- Colour: light and dark palettes with hex values, all named as placeholders until judged on a device, with contrast ratios computed for text and for the selection mark over photos.
+- Type: system fonts only (SF, SF Rounded, SF Mono, New York if you can justify it), a scale, where rounded digits are used.
+- Components: selection mark, photo cell, section headers, bottom bar, primary and secondary buttons, sheets, empty states.
+- Motion and haptics in two lines.
+- ASCII wireframes for Welcome, Home, Review and the receipt after a delete.
+- Cost in SwiftUI with an iOS 17 floor, the effect on scroll performance, the risk of looking like an AI-design default.
+
+Then recommend one direction and say what to build first.
+
+Deliverable: the three directions, the recommendation, and idea cards for the first five changes.
+
+### M25. Motion, haptics and interaction craft (`M25-motion-haptics`)
+
+Questions:
+1. Which moments deserve craft: select, deselect, Delete above, delete done, scan progress, counting numbers, list changes after a delete, sheets?
+2. What do Apple's guidelines and sessions say about haptics and motion (cite pages), and which SwiftUI APIs fit on an iOS 17 floor (`sensoryFeedback`, `contentTransition`, `symbolEffect`, `phaseAnimator`, `scrollTransition`, `matchedGeometryEffect`)?
+3. Performance: the review grid is sensitive to heavy per-cell effects (A5). Which effects are safe there, and how to test them on a phone?
+4. Reduce motion and accessibility behaviour for each effect.
+
+Read first: `App/Views/ReviewView.swift`, `HomeView.swift`, `CLAUDE.md` (the scroll trap).
+
+Deliverable: a spec table (moment, animation, haptic, duration, reduce-motion fallback, cost), a short list of things to avoid, and idea cards for H06, H07, H18.
+
+### M26. Design benchmarks (`M26-benchmarks`)
+
+Why: learn from apps that feel premium and native.
+
+Task: study 12 to 15 apps, chosen by evidence (photo cleaners, Apple Photos, photo editors, utilities with a strong reputation for craft). For each: onboarding, home, selection and bulk actions, progress, results, empty states, icon, store presentation. Give at least 15 concrete patterns to borrow and 10 to avoid, each with the app and the screen where you saw it. Describe, do not copy images into the repository. Include Apple's Human Interface Guidelines pages that apply (materials, colour, typography, selection, feedback, Liquid Glass) with URLs and dates.
+
+Deliverable: the pattern list, a short "what premium looks like in a cleanup app" statement with evidence, and idea cards for H03, H04, H05, H13, H14.
+
+### M27. Information design: numbers, progress and results (`M27-info-design`)
+
+Why: the product shows space, counts and time. Make them honest and memorable.
+
+Read first: `App/Views/HomeView.swift`, `SettingsView.swift` (the deletion summary), `docs/research/agents/M07-storage.md` if it exists.
+
+Questions:
+1. The Home hero number: what it should claim, given that space returns only after Recently Deleted is emptied.
+2. A category breakdown that works with one accent colour: bar, ring, strip of frames, list. Accessibility of each (no colour-only meaning).
+3. Scan progress: what to show (stage, count, what was found so far), and what not to promise (time left).
+4. The result after a delete: a receipt strip or sheet, the wording, what it teaches about Recently Deleted.
+5. Number formatting and units (byte count style, Slovak and English).
+
+Deliverable: five concepts with ASCII wireframes, a recommendation, and idea cards for H03, H04, H05, H18.
+
+### M28. Microcopy and voice (`M28-copy`)
+
+Task: list every user-facing string in the app with file and line (`grep` the Swift files), judge each against the voice rules, and rewrite the weak ones. Voice rules to check and extend: short plain sentences, no em dashes, no emoji, honest wording of the promise (check each claim against Part A2), ready for Slovak (no idioms, no word play that will not translate), no fear, no hype.
+
+Deliverable: a style guide of 10 rules, a table (file:line, current text, proposed text, reason), error and empty state copy, and the honest one-sentence promise in English and a draft in Slovak (mark the Slovak as a draft for a native check).
+
+### M29. Icon, store and README visuals (`M29-brand-assets`)
+
+Read first: `Design/AppIcon.svg`, `scripts/render-icon.sh`, `docs/research/identity.md`, `README.md`.
+
+Questions:
+1. The icon on iOS 18 and later: dark and tinted variants, the layered icon model of the newest tools, what to keep from the contact-sheet concept.
+2. Store screenshots and a preview video for a free open source utility: a set of 5, what each shows, the captions in English and Slovak (drafts).
+3. README visuals: a hero image and a short demo loop that prove the promise (airplane mode).
+4. Asset production that fits this repository: SVG source, scripts, no third-party tools.
+
+Deliverable: a plan with effort, an asset list, and idea cards for H15 and H16.
+
 ## Part E. Launch plan and synthesis
 
 ### E1. Caps and waves
@@ -631,6 +762,7 @@ Deliverable: a design with function signatures for CleanupCore, test cases, the 
 - At most 5 agents run at the same time. At most 5 of those may write code.
 - Research missions write only their own file under `docs/research/agents/`, so they never collide.
 - Suggested waves. Wave 1: M03, M01, M02 (the fact base), then M19 and M05. Wave 2: M04, M06, M11, M22, M13. Wave 3: M07, M08, M09, M10, M12, M14, M15, M16, M17, M18. Wave 4: M20a to M20f, then M21.
+- Wave D (design, alongside the others): M23 and M24 first (they read the screenshots), then M25, M26, M27, M28, M29. Design missions report the separate Design score.
 - Multi-agent runs cost roughly 15 times the tokens of a chat. Do not launch a mission whose answer would not change a decision.
 
 ### E2. Launcher prompt
