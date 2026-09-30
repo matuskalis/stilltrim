@@ -97,6 +97,7 @@ Look: native iOS, SF, system materials, one accent colour (red). The selection m
 - Text recognition, scene labels and barcode detection fail the same way in the simulator, so every screenshot lands in Mix there. The rules are covered by `ScreenshotClassifierTests`, Vision on drawn screens by `ScreenshotAnalyzerTests` (Mac only), and real screenshots need a device pass.
 - Vision revision 2 distances on 16 photographs: different scenes start at 0.72, same-scene variants (recompressed, cropped, exposure shifted) stay at or below 0.44. The 0.45 threshold sits in that gap.
 - `simctl privacy grant photos` does not work on this simulator, the UI test accepts the prompt instead.
+- A delete of 349 photos in one batch on the simulator left the rest of the review list in place, so the library change observer did not clear it (30 Sep 2026). Whether a phone behaves the same is still to check.
 - Scale, 2,031 photos in the simulator with an optimized build: cold scan 18.6 s, warm rescan 0.44 s. A Debug build is about 6 times slower in the analysis stage.
 - Sizing (`PHAssetResource` lookups) costs about 4.3 ms per asset and is now the largest cold-scan stage (8.8 s of 18.6 s). At 20,000 assets that is about 90 s.
 
