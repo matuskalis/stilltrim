@@ -45,6 +45,8 @@ Synthesis of the round described in `feature-brief.md`. The raw agent reports st
 9. Hero wording: "to review", not "can be cleaned".
 10. Kinds check as a debug-only screen, counts only. Yes.
 11. Hide photos whose original is only in iCloud, after the device check. Yes.
+12. Best-shot: may a "close call" group start unticked, which tightens rule 4 a little? Recommend yes.
+13. Best-shot: may the cache hold a few face numbers (eye openness), and may the scan read group members at 1,024 px for it? Recommend yes, numbers only, no images.
 
 ## Not doing
 
