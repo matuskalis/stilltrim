@@ -1,3 +1,4 @@
+import CleanupCore
 @preconcurrency import Photos
 import UIKit
 import os
@@ -145,6 +146,17 @@ actor PhotoLibraryService {
         } onCancel: {
             if let requestID = request.cancel() { manager.cancelImageRequest(requestID) }
         }
+    }
+
+    /// The state the library is in right now, for the check before a deletion. Ids that no longer
+    /// exist are absent.
+    func currentSnapshots(for ids: Set<String>) -> [String: AssetSnapshot] {
+        var snapshots: [String: AssetSnapshot] = [:]
+        PHAsset.fetchAssets(withLocalIdentifiers: Array(ids), options: nil).enumerateObjects { asset, _, _ in
+            snapshots[asset.localIdentifier] = AssetSnapshot(
+                modificationDate: asset.modificationDate, isFavorite: asset.isFavorite)
+        }
+        return snapshots
     }
 
     /// Deletes what still exists and returns those ids, so the caller reports what really happened.

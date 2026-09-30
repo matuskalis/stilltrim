@@ -14,10 +14,15 @@ public struct CleanupItem: Identifiable, Sendable, Hashable {
     public let badge: String?
     public let screenshotKind: ScreenshotKind?
     public var isKeeper: Bool
+    /// Nil means unknown, and the delete-time check treats such a photo as unverifiable.
+    public let modificationDate: Date?
+    /// As scanned. Compared again at delete time.
+    public let isFavorite: Bool
 
     public init(
         id: String, byteSize: Int64, creationDate: Date, duration: TimeInterval? = nil,
-        badge: String? = nil, screenshotKind: ScreenshotKind? = nil, isKeeper: Bool = false
+        badge: String? = nil, screenshotKind: ScreenshotKind? = nil, isKeeper: Bool = false,
+        modificationDate: Date? = nil, isFavorite: Bool = false
     ) {
         self.id = id
         self.byteSize = byteSize
@@ -26,6 +31,8 @@ public struct CleanupItem: Identifiable, Sendable, Hashable {
         self.badge = badge
         self.screenshotKind = screenshotKind
         self.isKeeper = isKeeper
+        self.modificationDate = modificationDate
+        self.isFavorite = isFavorite
     }
 }
 

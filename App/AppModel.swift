@@ -8,6 +8,8 @@ struct DeletionSummary: Identifiable, Equatable {
     let id = UUID()
     let count: Int
     let bytes: Int64
+    /// Photos left alone because they changed after the scan.
+    var keptChanged = 0
 }
 
 @MainActor
@@ -184,21 +186,29 @@ final class AppModel {
     func delete(ids requested: Set<String>) async {
         guard !requested.isEmpty, let before = review.result else { return }
         deletionError = nil
-        let deleted: Set<String>
-        do {
-            deleted = try await library.delete(ids: requested)
-        } catch {
-            if (error as? PHPhotosError)?.code != .userCancelled {
-                deletionError = "The photos could not be deleted: \(error.localizedDescription)"
+        // Second line of defence: the change observer can lag, so compare with the library now.
+        let gate = DeletionGate.partition(
+            requested: requested, scanned: before.snapshots,
+            current: await library.currentSnapshots(for: requested))
+        var deleted: Set<String> = []
+        if !gate.allowed.isEmpty {
+            do {
+                deleted = try await library.delete(ids: gate.allowed)
+            } catch {
+                if (error as? PHPhotosError)?.code != .userCancelled {
+                    deletionError = "The photos could not be deleted: \(error.localizedDescription)"
+                }
+                return
             }
-            return
         }
         let bytes = before.byteSize(of: deleted)
-        // Ids that were already gone from the library leave the results as well.
+        // Ids that were already gone from the library, and the changed ones, leave the results as well.
         review.remove(ids: requested)
         await cache.remove(ids: Array(requested))
         await cache.save()
-        if !deleted.isEmpty { lastDeletion = DeletionSummary(count: deleted.count, bytes: bytes) }
+        if !deleted.isEmpty || !gate.changed.isEmpty {
+            lastDeletion = DeletionSummary(count: deleted.count, bytes: bytes, keptChanged: gate.changed.count)
+        }
     }
 
     /// The best photo of a group stays in the library anyway, so it cannot be "kept" away.

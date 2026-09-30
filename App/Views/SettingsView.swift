@@ -5,17 +5,28 @@ struct DeletionSummaryView: View {
     let summary: DeletionSummary
     @Environment(AppModel.self) private var model
 
+    private var keptChangedText: String {
+        summary.keptChanged == 1
+            ? "1 photo changed after the scan and was kept."
+            : "\(summary.keptChanged.formatted()) photos changed after the scan and were kept."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("\(summary.count.formatted()) deleted")
+            Text(summary.count > 0 ? "\(summary.count.formatted()) deleted" : "Nothing deleted")
                 .font(.title.bold())
-            Text("They moved to Recently Deleted. The \(summary.bytes.formatted(.byteCount(style: .file))) comes back once you empty it. If you use iCloud Photos, they leave your other devices too.")
-            VStack(alignment: .leading, spacing: 8) {
-                Text("To empty it")
-                    .font(.headline)
-                Text("1. Open Photos, then Albums.")
-                Text("2. Scroll down to Recently Deleted.")
-                Text("3. Tap Select, then Delete All.")
+            if summary.keptChanged > 0 {
+                Text(keptChangedText)
+            }
+            if summary.count > 0 {
+                Text("They moved to Recently Deleted. The \(summary.bytes.formatted(.byteCount(style: .file))) comes back once you empty it. If you use iCloud Photos, they leave your other devices too.")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("To empty it")
+                        .font(.headline)
+                    Text("1. Open Photos, then Albums.")
+                    Text("2. Scroll down to Recently Deleted.")
+                    Text("3. Tap Select, then Delete All.")
+                }
             }
             Spacer()
             Button("Done") { model.dismissDeletionSummary() }
