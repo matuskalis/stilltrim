@@ -10,9 +10,19 @@ cd "$(dirname "$0")/.."
 team=$(grep -hE '^DEVELOPMENT_TEAM *= *[A-Z0-9]{10}' Config/Local.xcconfig 2>/dev/null | head -1 | sed -E 's/.*= *//' || true)
 if [ -z "$team" ] && [ -f Stilltrim.xcodeproj/project.pbxproj ]; then
   team=$(grep -m1 -oE 'DEVELOPMENT_TEAM = [A-Z0-9]{10}' Stilltrim.xcodeproj/project.pbxproj | awk '{print $3}' || true)
+  # The team chosen in Xcode lives in the generated project, which xcodegen rewrites. Keep it in the
+  # ignored Local.xcconfig so it survives.
+  if [ -n "$team" ]; then printf 'DEVELOPMENT_TEAM = %s\n' "$team" >> Config/Local.xcconfig; fi
 fi
 if [ -z "$team" ]; then
-  echo "No team id. Copy Config/Local.xcconfig.example to Config/Local.xcconfig and fill it in." >&2
+  # A development certificate made by Xcode (Settings, Accounts, Manage Certificates, +) carries the team id.
+  team=$(security find-certificate -c "Apple Development" -p 2>/dev/null \
+    | openssl x509 -noout -subject -nameopt RFC2253 2>/dev/null | grep -oE 'OU=[A-Z0-9]{10}' | head -1 | cut -d= -f2 || true)
+  if [ -n "$team" ]; then printf 'DEVELOPMENT_TEAM = %s\n' "$team" >> Config/Local.xcconfig; fi
+fi
+if [ -z "$team" ]; then
+  echo "No team id. In Xcode: Settings, Accounts, your Apple ID, Manage Certificates, +, Apple Development." >&2
+  echo "Or copy Config/Local.xcconfig.example to Config/Local.xcconfig and fill it in." >&2
   exit 1
 fi
 
