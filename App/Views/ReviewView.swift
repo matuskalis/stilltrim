@@ -26,6 +26,12 @@ private final class ScrollTracker {
             notScrolledPast.insert(id)
         }
     }
+
+    /// A photo that left the screen without a last report is unknown again, so a hard flick cannot leave
+    /// it pinned as "not scrolled past" at the top of the list.
+    func forget(_ id: String) {
+        if notScrolledPast.contains(id) { notScrolledPast.remove(id) }
+    }
 }
 
 /// One heading and its photos. A category without headings is one section with no title.
@@ -162,6 +168,7 @@ struct ReviewView: View {
         } action: { scrolledPast in
             tracker.update(item.id, scrolledPast: scrolledPast)
         }
+        .onDisappear { tracker.forget(item.id) }
         .contextMenu {
             Button("Preview", systemImage: "eye") { preview = PreviewTarget(id: item.id) }
             if !item.isKeeper {
