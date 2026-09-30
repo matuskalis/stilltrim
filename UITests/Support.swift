@@ -52,8 +52,14 @@ extension XCTestCase {
             return
         }
         ask.tap()
-        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow Full Access"]
-        XCTAssertTrue(allow.waitForExistence(timeout: 20), "The photo access prompt did not appear")
-        allow.tap()
+        // The prompt animates in and a tap on it too early is lost, so tap again until it is gone.
+        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 60), "The photo access prompt did not appear")
+        let allow = alert.buttons["Allow Full Access"]
+        let until = Date().addingTimeInterval(60)
+        while alert.exists, Date() < until {
+            if allow.isHittable { allow.tap() }
+            Thread.sleep(forTimeInterval: 1)
+        }
     }
 }
