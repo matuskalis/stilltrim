@@ -5,20 +5,33 @@ struct DeletionSummaryView: View {
     let summary: DeletionSummary
     @Environment(AppModel.self) private var model
 
+    private var keptChangedText: String {
+        summary.keptChanged == 1
+            ? "1 photo changed after the scan and was kept."
+            : "\(summary.keptChanged.formatted()) photos changed after the scan and were kept."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("\(summary.count.formatted()) \(summary.count == 1 ? "item" : "items") deleted")
+            Text(summary.count > 0
+                ? "\(summary.count.formatted()) \(summary.count == 1 ? "item" : "items") deleted"
+                : "Nothing deleted")
                 .font(.title.bold())
                 .accessibilityIdentifier("deletion-title")
-            Text("Deleted items stay in Recently Deleted for 30 days. You can recover them there.")
-            if summary.bytes > 0 {
-                Text("The \(summary.bytes.formatted(.byteCount(style: .file))) comes back when you empty Recently Deleted.")
+            if summary.keptChanged > 0 {
+                Text(keptChangedText)
             }
-            Text("With iCloud Photos on, deleted items also leave your other devices.")
-            VStack(alignment: .leading, spacing: 8) {
-                Text("To empty Recently Deleted")
-                    .font(.headline)
-                Text("Open Photos. Recently Deleted is under Utilities. Unlock it, tap Select, then delete the items.")
+            if summary.count > 0 {
+                Text("Deleted items stay in Recently Deleted for 30 days. You can recover them there.")
+                if summary.bytes > 0 {
+                    Text("The \(summary.bytes.formatted(.byteCount(style: .file))) comes back when you empty Recently Deleted.")
+                }
+                Text("With iCloud Photos on, deleted items also leave your other devices.")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("To empty Recently Deleted")
+                        .font(.headline)
+                    Text("Open Photos. Recently Deleted is under Utilities. Unlock it, tap Select, then delete the items.")
+                }
             }
             Spacer()
             Button("Done") { model.dismissDeletionSummary() }

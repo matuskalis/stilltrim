@@ -267,7 +267,7 @@ struct ScanPipeline: Sendable {
             id: record.id, byteSize: bytes, creationDate: record.creationDate,
             duration: record.kind == .video ? record.duration : nil, badge: badge,
             screenshotKind: screenshotKind, isKeeper: isKeeper,
-            isFavorite: record.isFavorite, isEdited: isEdited
+            modificationDate: record.modificationDate, isFavorite: record.isFavorite, isEdited: isEdited
         )
     }
 
