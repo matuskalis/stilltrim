@@ -54,6 +54,8 @@ private final class ScrollTracker {
 private struct ReviewSection: Identifiable {
     let id: String
     let title: String?
+    /// The keeper rule's reason, shown under the title as secondary text.
+    var subtitle: String? = nil
     let items: [CleanupItem]
     /// What the select button ticks. Empty for similar groups, which come with their suggestions already
     /// selected, and when every item is a favourite or an edited photo.
@@ -70,7 +72,7 @@ struct ReviewView: View {
     @State private var bulkSelects = 0
     @State private var deletions = 0
 
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 2)]
+    private let columns = [GridItem(.adaptive(minimum: 104), spacing: DesignTokens.Review.gap)]
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -131,14 +133,18 @@ struct ReviewView: View {
                         .padding(.top, 80)
                 } else {
                     leftOutCaption(result.protectedCountLeftOut(in: category))
-                    LazyVGrid(columns: columns, spacing: 2, pinnedViews: [.sectionHeaders]) {
-                        ForEach(sections(of: result)) { section in
-                            Section {
-                                ForEach(section.items) { cell($0) }
-                            } header: {
-                                header(section)
-                            } footer: {
-                                if section.title != nil { Color.clear.frame(height: 16) }
+                    if category == .similar {
+                        similarGroups(sections(of: result))
+                    } else {
+                        LazyVGrid(columns: columns, spacing: DesignTokens.Review.gap, pinnedViews: [.sectionHeaders]) {
+                            ForEach(sections(of: result)) { section in
+                                Section {
+                                    ForEach(section.items) { cell($0) }
+                                } header: {
+                                    header(section, pinned: true)
+                                } footer: {
+                                    if section.title != nil { Color.clear.frame(height: DesignTokens.Review.groupGap) }
+                                }
                             }
                         }
                     }
@@ -149,6 +155,33 @@ struct ReviewView: View {
         .onGeometryChange(for: ClosedRange<CGFloat>.self) { proxy in
             proxy.safeAreaInsets.top...max(proxy.safeAreaInsets.top, proxy.size.height - proxy.safeAreaInsets.bottom)
         } action: { tracker.visibleTop = $0.lowerBound; tracker.visibleBottom = $0.upperBound }
+    }
+
+    /// A strip per group, so a pair or a trio fills its row. One lazy stack of groups keeps the cells lazy;
+    /// only groups of four or more nest a small grid. Headers scroll with the list instead of pinning.
+    private func similarGroups(_ sections: [ReviewSection]) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(sections) { section in
+                Section {
+                    groupTiles(section.items)
+                    Color.clear.frame(height: DesignTokens.Review.groupGap)
+                } header: {
+                    header(section, pinned: false)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func groupTiles(_ items: [CleanupItem]) -> some View {
+        if items.count == 2 || items.count == 3 {
+            HStack(spacing: DesignTokens.Review.gap) {
+                ForEach(items) { cell($0, side: DesignTokens.Review.largeTileSide) }
+            }
+        } else {
+            LazyVGrid(columns: columns, spacing: DesignTokens.Review.gap) {
+                ForEach(items) { cell($0) }
+            }
+        }
     }
 
     @ViewBuilder private func leftOutCaption(_ count: Int) -> some View {
@@ -171,8 +204,8 @@ struct ReviewView: View {
             result.similarGroups.map { group in
                 ReviewSection(
                     id: "group-\(group.id)",
-                    title: "\(group.items.count) similar · \(group.reclaimableBytes.formatted(.byteCount(style: .file))) to gain"
-                        + (group.reasonLine.map { "\n\($0)" } ?? ""),
+                    title: "\(group.items.count) similar · \(group.reclaimableBytes.formatted(.byteCount(style: .file))) to gain",
+                    subtitle: group.reasonLine,
                     items: group.items, bulkSelectableIDs: []
                 )
             }
@@ -189,21 +222,32 @@ struct ReviewView: View {
         }
     }
 
-    @ViewBuilder private func header(_ section: ReviewSection) -> some View {
+    @ViewBuilder private func header(_ section: ReviewSection, pinned: Bool) -> some View {
         if let title = section.title {
-            HStack {
-                Text(title)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: DesignTokens.Review.headerLineSpacing) {
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .monospacedDigit()
+                    if let subtitle = section.subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
                 if !section.bulkSelectableIDs.isEmpty {
                     Button(isFullySelected(section) ? "Deselect" : "Select") { toggle(section) }
+                        .font(.subheadline.weight(.semibold))
                         .accessibilityIdentifier("select-\(section.id)")
                 }
             }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, DesignTokens.Review.headerInset)
+            .padding(.top, DesignTokens.Review.headerTop)
+            .padding(.bottom, DesignTokens.Review.headerBottom)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
+            .background { if pinned { Rectangle().fill(.bar) } }
+            .accessibilityAddTraits(.isHeader)
         }
     }
 
@@ -221,12 +265,12 @@ struct ReviewView: View {
         }
     }
 
-    private func cell(_ item: CleanupItem) -> some View {
+    private func cell(_ item: CleanupItem, side: CGFloat = DesignTokens.Review.tileSide) -> some View {
         Button {
             selectTicks += 1
             model.toggle(item.id)
         } label: {
-            PhotoCell(item: item, isSelected: model.selection.contains(item.id))
+            PhotoCell(item: item, isSelected: model.selection.contains(item.id), side: side)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("cell-\(item.id)")
@@ -383,6 +427,7 @@ extension DeletionReceipt {
 private struct PhotoCell: View {
     let item: CleanupItem
     let isSelected: Bool
+    let side: CGFloat
     @Environment(AppModel.self) private var model
     @State private var image: CGImage?
 
@@ -405,7 +450,7 @@ private struct PhotoCell: View {
             .overlay(alignment: .topLeading) { protectedMark }
             .overlay(alignment: .bottomLeading) { badge }
             .overlay(alignment: .bottomTrailing) { videoLabel }
-            .task(id: item.id) { image = await model.thumbnails.image(for: item.id, side: 400) }
+            .task(id: item.id) { image = await model.thumbnails.image(for: item.id, side: side) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(isSelected ? "Selected" : "Not selected")

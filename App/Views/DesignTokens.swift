@@ -19,6 +19,18 @@ enum DesignTokens {
         static let selectedPhotoScale = CGFloat(SelectionMarkSpec.selectedPhotoScale)
     }
 
+    enum Review {
+        static let gap = CGFloat(2)
+        static let groupGap = CGFloat(12)
+        static let headerInset = CGFloat(12)
+        static let headerTop = CGFloat(10)
+        static let headerBottom = CGFloat(4)
+        static let headerLineSpacing = CGFloat(1)
+        /// Thumbnail pixels: adaptive tiles are about 130 pt wide, pairs and trios 130 to 200 pt at 3x.
+        static let tileSide = CGFloat(400)
+        static let largeTileSide = CGFloat(600)
+    }
+
     enum Pill {
         static let scrim = Color.black.opacity(SelectionMarkSpec.pillScrimOpacity)
         static let text = Color.white
