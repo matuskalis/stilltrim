@@ -83,11 +83,12 @@ struct ReviewView: View {
                             ReceiptStrip(receipt: receipt, explain: { explainedBatch = receipt.batch })
                         }
                         DeleteBar(category: category, tracker: tracker, deleteAll: { await delete($0) }) { ids, anchor in
+                            let target = restoreTarget(for: anchor)
                             await delete(ids)
                             // The photos above are gone, so everything below moves up. Go back to where the
                             // user was, or the next rows would slide past unseen.
                             await Task.yield()
-                            if let anchor { proxy.scrollTo(anchor, anchor: .top) }
+                            if let target { proxy.scrollTo(target, anchor: .top) }
                         }
                     }
                 }
@@ -166,10 +167,19 @@ struct ReviewView: View {
                     groupTiles(section.items)
                     Color.clear.frame(height: DesignTokens.Review.groupGap)
                 } header: {
-                    header(section, pinned: false)
+                    header(section, pinned: false).id("anchor-\(section.id)")
                 }
             }
         }
+    }
+
+    /// Where the list goes back to after "Delete above". A photo inside a similar group's row is not a direct
+    /// child of the lazy stack, which can only scroll to its direct children, so the list goes back to that
+    /// group's header. Every other list is one grid whose cells are direct children.
+    private func restoreTarget(for photoID: String?) -> String? {
+        guard let photoID else { return nil }
+        guard category == .similar else { return photoID }
+        return model.result?.similarGroups.first { $0.items.contains { $0.id == photoID } }.map { "anchor-group-\($0.id)" }
     }
 
     @ViewBuilder private func groupTiles(_ items: [CleanupItem]) -> some View {
