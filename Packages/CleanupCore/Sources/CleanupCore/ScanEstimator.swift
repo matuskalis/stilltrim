@@ -49,8 +49,11 @@ public enum ScanEstimator {
 
     /// `done` and `total` are the counts the stage reports. For analysing they include photos that were already
     /// cached, so the items finished in this scan are `done - (total - pending)`.
+    /// `doneAtStageStart` is what the stage had reported when its first update arrived. Sizing reports in batches,
+    /// so that first update already holds a batch whose time was never measured: the rate comes from the items
+    /// finished since, over the time since.
     public static func secondsLeft(
-        plan: ScanWorkPlan?, stage: ScanStage, done: Int, total: Int, secondsInStage: Double
+        plan: ScanWorkPlan?, stage: ScanStage, done: Int, total: Int, secondsInStage: Double, doneAtStageStart: Int = 0
     ) -> Double? {
         guard let plan else { return nil }
         var left = 0.0
@@ -65,9 +68,11 @@ public enum ScanEstimator {
         case .sizing, .analyzing, .reading:
             let pending = pending(stage, in: plan)
             let finished = min(max(done - (total - pending), 0), pending)
-            let hasEnoughData = finished > 0
-                && (finished >= minItemsForObservedRate || secondsInStage >= minSecondsForObservedRate)
-            let rate = hasEnoughData ? secondsInStage / Double(finished) : prior(for: stage)
+            let finishedAtStart = min(max(doneAtStageStart - (total - pending), 0), finished)
+            let observed = finished - finishedAtStart
+            let hasEnoughData = observed > 0
+                && (observed >= minItemsForObservedRate || secondsInStage >= minSecondsForObservedRate)
+            let rate = hasEnoughData ? secondsInStage / Double(observed) : prior(for: stage)
             left += rate * Double(pending - finished)
         }
         return max(left, 0)
@@ -83,12 +88,11 @@ public enum ScanEstimator {
     }
 }
 
-/// Keeps the shown value calm. It follows every fall at once. A rise is limited, so when the estimate turns
-/// out too low the value stops counting down and climbs slowly instead of jumping.
+/// Keeps the shown value calm. It follows every fall at once. A higher estimate is approached over a few seconds
+/// instead of jumped to, so the value neither flickers nor lags behind a stage that turns out slower than the prior.
 public struct ScanTimeLeft: Sendable {
-    /// Seconds of rise allowed per second of real time. Counting down costs 1 per second, so the net climb
-    /// is at most 0.5 s per second.
-    public static let maxRisePerSecond = 1.5
+    /// Seconds in which the shown value covers about two thirds of the way to a higher estimate.
+    public static let riseTimeConstant = 4.0
 
     private var shown: Double?
     private var lastElapsed = 0.0
@@ -104,8 +108,8 @@ public struct ScanTimeLeft: Sendable {
             return target
         }
         let seconds = max(elapsed - lastElapsed, 0)
-        let ceiling = previous - seconds + Self.maxRisePerSecond * seconds
-        let next = max(min(target, ceiling), 0)
+        let counted = max(previous - seconds, 0)
+        let next = target <= counted ? target : counted + (target - counted) * (1 - exp(-seconds / Self.riseTimeConstant))
         shown = next
         return next
     }

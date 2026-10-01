@@ -56,4 +56,13 @@ import Testing
         let drag = DragSelection(order: [], startSelection: ["x"], anchor: "x")
         #expect(drag.selection(through: "x") == ["x"])
     }
+
+    @Test func selectingSkipsIdsThatMayNotBeSelectedAndDeselectingClearsThem() {
+        let select = DragSelection(order: order, startSelection: [], anchor: "a", selectable: ["a", "b", "d", "e"])
+        #expect(select.selection(through: "e") == ["a", "b", "d", "e"])
+
+        let deselect = DragSelection(order: order, startSelection: ["a", "c", "e"], anchor: "a", selectable: ["a", "b"])
+        #expect(deselect.mode == .deselect)
+        #expect(deselect.selection(through: "e").isEmpty)
+    }
 }

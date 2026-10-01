@@ -14,11 +14,17 @@ public struct DragSelection: Sendable {
     private let order: [String]
     private let startSelection: Set<String>
     private let anchorIndex: Int?
+    private let selectable: Set<String>?
 
     /// `mode` defaults to what the first photo calls for: a selected one starts deselecting, an unselected one selecting.
-    public init(order: [String], startSelection: Set<String>, anchor: String, mode: Mode? = nil) {
+    /// `selectable` limits what a select swipe may add, so favourites and edited photos stay out as with Select all;
+    /// a deselect swipe clears every id in its run.
+    public init(
+        order: [String], startSelection: Set<String>, anchor: String, mode: Mode? = nil, selectable: Set<String>? = nil
+    ) {
         self.order = order
         self.startSelection = startSelection
+        self.selectable = selectable
         self.mode = mode ?? (startSelection.contains(anchor) ? .deselect : .select)
         indexOf = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         anchorIndex = indexOf[anchor]
@@ -28,7 +34,7 @@ public struct DragSelection: Sendable {
         guard let anchorIndex, let currentIndex = indexOf[current] else { return startSelection }
         let run = order[min(anchorIndex, currentIndex)...max(anchorIndex, currentIndex)]
         switch mode {
-        case .select: return startSelection.union(run)
+        case .select: return startSelection.union(selectable.map { allowed in run.filter(allowed.contains) } ?? Array(run))
         case .deselect: return startSelection.subtracting(run)
         }
     }

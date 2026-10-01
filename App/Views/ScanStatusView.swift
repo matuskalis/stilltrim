@@ -10,6 +10,8 @@ struct ScanStatusView: View {
     @State private var smoother = ScanTimeLeft()
     @State private var trackedStage = ScanStage.listing
     @State private var stageStartedAt = Date()
+    /// What the stage had already reported with its first update. Sizing reports in batches of 500.
+    @State private var stageStartDone = 0
     @State private var anchor: (secondsLeft: Double?, at: Date) = (nil, Date())
     @State private var timeLeftText = ScanEstimator.text(secondsLeft: nil, elapsed: 0)
 
@@ -44,11 +46,12 @@ struct ScanStatusView: View {
         if progress.stage != trackedStage {
             trackedStage = progress.stage
             stageStartedAt = now
+            stageStartDone = progress.done
         }
         anchor = (
             ScanEstimator.secondsLeft(
                 plan: progress.plan, stage: progress.stage, done: progress.done, total: progress.total,
-                secondsInStage: now.timeIntervalSince(stageStartedAt)),
+                secondsInStage: now.timeIntervalSince(stageStartedAt), doneAtStageStart: stageStartDone),
             now
         )
         refresh()

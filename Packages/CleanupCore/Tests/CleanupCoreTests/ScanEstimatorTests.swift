@@ -91,19 +91,22 @@ import Testing
         #expect(ScanEstimator.text(secondsLeft: 47 * 60, elapsed: 5) == "About 45 min left")
     }
 
-    @Test func smoothingLimitsHowFastTheValueRises() throws {
+    @Test func smoothingEasesTowardAHigherEstimateWithoutJumping() throws {
         var smoother = ScanTimeLeft()
-        #expect(smoother.update(raw: 100, elapsed: 3) == 100)
-        let first = smoother.update(raw: 120, elapsed: 4)
-        var value = try #require(first)
-        #expect(value <= 100 - 1 + ScanTimeLeft.maxRisePerSecond + 1e-9)
-        for second in 5...100 {
-            let updated = smoother.update(raw: 120, elapsed: Double(second))
+        #expect(smoother.update(raw: 30, elapsed: 3) == 30)
+        // The estimate turns out to be 90 s: one second later the value has covered only part of the gap.
+        let first = smoother.update(raw: 90, elapsed: 4)
+        var shown = try #require(first)
+        #expect(shown > 29 && shown - 29 < 0.5 * (90 - 29))
+        for second in 5...30 {
+            let target = 90.0 - Double(second - 4)
+            let updated = smoother.update(raw: target, elapsed: Double(second))
             let next = try #require(updated)
-            #expect(next - value <= ScanTimeLeft.maxRisePerSecond - 1 + 1e-9)
-            value = next
+            #expect(next <= target + 1e-9)
+            #expect(next >= shown - 1 - 1e-9)
+            shown = next
         }
-        #expect(value == 120)
+        #expect(abs(shown - (90.0 - 26)) < 1.0)
     }
 
     @Test func smoothingFollowsFallsAndStaysNonNegative() {
@@ -117,5 +120,18 @@ import Testing
     @Test func smoothingStaysNilWithoutAnEstimate() {
         var smoother = ScanTimeLeft()
         #expect(smoother.update(raw: nil, elapsed: 1) == nil)
+    }
+
+    @Test func aStageThatReportsInBatchesIsNotTimedFromItsFirstBatch() throws {
+        let later = 500 * ScanEstimator.analyzingSecondsPerItem + 50 * ScanEstimator.readingSecondsPerItem
+            + ScanEstimator.groupingSeconds
+        // The first report already holds a batch of 500 and no time was measured for it: the prior applies.
+        let first = try #require(ScanEstimator.secondsLeft(
+            plan: plan, stage: .sizing, done: 500, total: 1_000, secondsInStage: 0, doneAtStageStart: 500))
+        #expect(abs(first - (500 * ScanEstimator.sizingSecondsPerItem + later)) < 1e-9)
+        // Then 250 more items in 2 s: that is the observed rate.
+        let next = try #require(ScanEstimator.secondsLeft(
+            plan: plan, stage: .sizing, done: 750, total: 1_000, secondsInStage: 2, doneAtStageStart: 500))
+        #expect(abs(next - (250 * (2.0 / 250) + later)) < 1e-9)
     }
 }

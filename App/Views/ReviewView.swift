@@ -10,7 +10,6 @@ private struct PreviewTarget: Identifiable {
 
 private let scrollSpace = "review-scroll"
 /// How far a finger moves before the list decides between scrolling and swiping across photos.
-private let swipeSlop: CGFloat = 10
 
 private enum CellPosition {
     case above, onScreen, below
@@ -59,19 +58,11 @@ private final class ScrollTracker {
 /// headers of the grids that can be swiped report here, in the scroll view's coordinate space.
 @MainActor
 private final class SwipeSelection {
-    enum Phase {
-        case idle, scrolling, selecting
-    }
-
     var cellFrames: [String: CGRect] = [:]
     var headerFrames: [String: CGRect] = [:]
-    var phase = Phase.idle
-    var touchStart: CGPoint?
     var drag: DragSelection?
     var applied: Set<String> = []
     var lastCell: String?
-    /// A swipe that ends on the cell it began on would also reach that cell's button as a tap.
-    var swallowTap = false
 
     func cell(at point: CGPoint) -> String? {
         if headerFrames.values.contains(where: { $0.contains(point) }) { return nil }
@@ -118,7 +109,6 @@ struct ReviewView: View {
     @State private var explainedBatch: DeletionSummary?
     @State private var tracker = ScrollTracker()
     @State private var swipe = SwipeSelection()
-    @State private var isSwiping = false
     @State private var selectTicks = 0
     @State private var bulkSelects = 0
     @State private var deletions = 0
@@ -199,54 +189,36 @@ struct ReviewView: View {
                                 }
                             }
                         }
-                        .simultaneousGesture(swipeGesture)
+                        .background(SwipeSelectRecognizer(
+                            canBegin: swipeCanBegin, began: swipeBegan, moved: swipeMoved, ended: swipeEnded))
                     }
                 }
             }
         }
-        .scrollDisabled(isSwiping)
         .coordinateSpace(.named(scrollSpace))
         .onGeometryChange(for: ClosedRange<CGFloat>.self) { proxy in
             proxy.safeAreaInsets.top...max(proxy.safeAreaInsets.top, proxy.size.height - proxy.safeAreaInsets.bottom)
         } action: { tracker.visibleTop = $0.lowerBound; tracker.visibleBottom = $0.upperBound }
     }
 
-    /// A swipe that starts more across than down selects the photos it passes over, like the Photos app.
-    /// One that starts more down than across is left to the list to scroll.
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: swipeSlop, coordinateSpace: .named(scrollSpace))
-            .onChanged(swipeChanged)
-            .onEnded { _ in swipeEnded() }
+    /// A swipe that starts sideways on a photo selects the photos it passes over, like the Photos app. The list
+    /// keeps every other drag, see `SwipeSelectRecognizer`.
+    private func swipeCanBegin(at start: CGPoint) -> Bool {
+        swipe.cell(at: start) != nil
     }
 
-    private func swipeChanged(_ value: DragGesture.Value) {
-        if swipe.touchStart != value.startLocation {
-            swipe.touchStart = value.startLocation
-            swipe.phase = .idle
-        }
-        switch swipe.phase {
-        case .scrolling: return
-        case .idle: beginSwipe(value)
-        case .selecting: break
-        }
-        guard swipe.phase == .selecting, let cell = swipe.cell(at: value.location), cell != swipe.lastCell else { return }
-        swipe.lastCell = cell
-        applySwipe(through: cell)
-    }
-
-    private func beginSwipe(_ value: DragGesture.Value) {
-        guard abs(value.translation.width) > abs(value.translation.height),
-              let anchor = swipe.cell(at: value.startLocation),
-              let order = model.result?.items(in: category).map(\.id)
-        else {
-            swipe.phase = .scrolling
-            return
-        }
-        swipe.phase = .selecting
-        swipe.drag = DragSelection(order: order, startSelection: model.selection, anchor: anchor)
+    private func swipeBegan(from start: CGPoint, at location: CGPoint) {
+        guard let anchor = swipe.cell(at: start), let order = model.result?.items(in: category).map(\.id) else { return }
+        swipe.drag = DragSelection(order: order, startSelection: model.selection, anchor: anchor, selectable: selectableIDs)
         swipe.applied = model.selection
         swipe.lastCell = nil
-        isSwiping = true
+        swipeMoved(to: location)
+    }
+
+    private func swipeMoved(to location: CGPoint) {
+        guard swipe.drag != nil, let cell = swipe.cell(at: location), cell != swipe.lastCell else { return }
+        swipe.lastCell = cell
+        applySwipe(through: cell)
     }
 
     /// Changes the selection only by what moved since the last change, so a long swipe is one update per
@@ -264,14 +236,7 @@ struct ReviewView: View {
     }
 
     private func swipeEnded() {
-        let wasSelecting = swipe.phase == .selecting
-        swipe.phase = .idle
-        swipe.touchStart = nil
         swipe.drag = nil
-        isSwiping = false
-        guard wasSelecting else { return }
-        swipe.swallowTap = true
-        Task { swipe.swallowTap = false }
     }
 
     /// A strip per group, so a pair or a trio fills its row. One lazy stack of groups keeps the cells lazy;
@@ -394,7 +359,6 @@ struct ReviewView: View {
 
     private func cell(_ item: CleanupItem, side: CGFloat = DesignTokens.Review.tileSide) -> some View {
         Button {
-            guard !swipe.swallowTap else { return }
             selectTicks += 1
             model.toggle(item.id)
         } label: {
@@ -668,6 +632,7 @@ private struct PreviewView: View {
     @State private var image: CGImage?
     @State private var player: AVPlayer?
     @State private var finished = false
+    @State private var couldNotLoad = false
 
     var body: some View {
         NavigationStack {
@@ -679,6 +644,11 @@ private struct PreviewView: View {
                 } else if let player {
                     VideoPlayer(player: player)
                         .ignoresSafeArea(edges: .bottom)
+                } else if couldNotLoad {
+                    ContentUnavailableView(
+                        "Could not open the video", systemImage: "exclamationmark.triangle",
+                        description: Text("Close this and try again.")
+                    )
                 } else if finished {
                     ContentUnavailableView(
                         "Not on this phone", systemImage: "icloud",
@@ -708,11 +678,15 @@ private struct PreviewView: View {
     }
 
     private func loadVideo() async {
-        guard case let .playable(box) = await model.library.playerItem(for: id) else { return }
-        // Follows the silent switch and mixes with other audio, so a preview never blasts sound.
-        try? AVAudioSession.sharedInstance().setCategory(.ambient)
-        let player = AVPlayer(playerItem: box.item)
-        self.player = player
-        player.play()
+        switch await model.library.playerItem(for: id) {
+        case let .playable(box):
+            // Follows the silent switch and mixes with other audio, so a preview never blasts sound.
+            try? AVAudioSession.sharedInstance().setCategory(.ambient)
+            let player = AVPlayer(playerItem: box.item)
+            self.player = player
+            player.play()
+        case .notOnDevice: break
+        case .failed: couldNotLoad = true
+        }
     }
 }

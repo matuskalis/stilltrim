@@ -32,7 +32,7 @@ fi
 # 2. No networking, web, ads, tracking or analytics APIs in the source. The last five are OS calls that make
 # the system fetch data for the app (embedding assets, a cloud language model, resource upload, downloadable
 # Vision assets), which no networking symbol would show.
-DENY='requestAssets|PrivateCloudComputeLanguageModel|PHAssetResourceUploadJob|downloadAssets|DownloadableAssetsRequest|NSURLSession|URLComponents|NSURLComponents|NSURL\b|dataRepresentation|resolvingBookmarkData|dlopen|dlsym|getStreamsToHost|NSClassFromString|URLSession|URLRequest|URLConnection|NWConnection|NWPathMonitor|NWListener|CFNetwork|CFSocket|CFStream|import Network|import WebKit|WKWebView|SFSafariViewController|import SafariServices|ASWebAuthenticationSession|import AdSupport|ASIdentifierManager|AppTrackingTransparency|ATTrackingManager|import StoreKit|import CloudKit|import MessageUI|import Firebase|import Sentry|import Crashlytics|import Amplitude|import Mixpanel|import Segment|AsyncImage|NSUbiquitousKeyValueStore|NSBundleResourceRequest|AVURLAsset|AVAssetDownload|AVAggregateAssetDownloadTask|AVAssetResourceLoader|AVContentKeySession|AVPlayer\(url|AVPlayerItem\(url|UIPasteboard|ShareLink|UIActivityViewController|\bgetaddrinfo\b|\bgethostbyname\b|\bsocket\(|https?://'
+DENY='requestAssets|PrivateCloudComputeLanguageModel|PHAssetResourceUploadJob|downloadAssets|DownloadableAssetsRequest|NSURLSession|URLComponents|NSURLComponents|NSURL\b|dataRepresentation|resolvingBookmarkData|dlopen|dlsym|getStreamsToHost|NSClassFromString|URLSession|URLRequest|URLConnection|NWConnection|NWPathMonitor|NWListener|CFNetwork|CFSocket|CFStream|import Network|import WebKit|WKWebView|SFSafariViewController|import SafariServices|ASWebAuthenticationSession|import AdSupport|ASIdentifierManager|AppTrackingTransparency|ATTrackingManager|import StoreKit|import CloudKit|import MessageUI|import Firebase|import Sentry|import Crashlytics|import Amplitude|import Mixpanel|import Segment|AsyncImage|NSUbiquitousKeyValueStore|NSBundleResourceRequest|AVAsset|AVURLAsset|AVAggregateAssetDownloadTask|AVContentKeySession|AVQueuePlayer|AVPlayerLooper|AVPlayer\([[:space:]]*url|AVPlayerItem\([[:space:]]*(url|asset)|UIPasteboard|ShareLink|UIActivityViewController|\bgetaddrinfo\b|\bgethostbyname\b|\bsocket\(|https?://'
 hits=$(code_matching "$DENY")
 if [ -n "$hits" ]; then
   fail "network, web, ad or analytics API in source:"; echo "$hits"
@@ -44,7 +44,7 @@ fi
 # Keep in step with ALLOW_LIBS in scripts/check-built-app.sh (the libraries the built binary may bind).
 # AVKit and AVFoundation are allowed on purpose, for local video preview only: playback goes through
 # PHImageManager player items with isNetworkAccessAllowed = false, and the code never builds a URL and
-# never opens a stream (AVURLAsset, AVPlayer(url:) and the AV download classes stay denied below)
+# never opens a stream (AVAsset and its subclasses, AVQueuePlayer, AVPlayer(url:) and AVPlayerItem(asset:) stay denied below)
 # (rules 2 and 3 reject URL(string:), NSURL and https literals).
 ALLOWED_IMPORTS='Foundation|SwiftUI|UIKit|Photos|PhotosUI|Vision|AVKit|AVFoundation|CoreGraphics|Accelerate|Observation|os|CleanupCore|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers'
 # An import at the start of a line, or after a ";" or a "*/" on the same line.
