@@ -45,6 +45,7 @@ struct ScanPipeline: Sendable {
     private func scan(_ records: [AssetRecord], progress: @Sendable (ScanProgress) -> Void) async throws -> ScanResult {
         var entries = await cache.lookup(records)
         try Task.checkCancellation()
+        progress(ScanProgress(stage: .listing, done: 0, total: 0, plan: workPlan(for: records, entries: entries)))
         try await addSizes(for: records, entries: &entries, progress: progress)
 
         var result = ScanResult()
@@ -99,6 +100,22 @@ struct ScanPipeline: Sendable {
         result.similarGroups.sort { $0.reclaimableBytes > $1.reclaimableBytes }
         try Task.checkCancellation()
         return result
+    }
+
+    /// Counts what the stages below will do, using the same tests they use, so the time left can be estimated.
+    private func workPlan(for records: [AssetRecord], entries: [String: AnalysisCache.Entry]) -> ScanWorkPlan {
+        var plan = ScanWorkPlan(sizing: 0, analyzing: 0, reading: 0)
+        for record in records {
+            let entry = entries[record.id]
+            if entry == nil || (entry?.stillBytes == nil && record.kind == .photo) { plan.sizing += 1 }
+            guard record.kind == .photo else { continue }
+            if record.isScreenshot {
+                if entry?.currentScreenshotKind == nil { plan.reading += 1 }
+            } else if entry?.fingerprint == nil {
+                plan.analyzing += 1
+            }
+        }
+        return plan
     }
 
     private func addSizes(

@@ -157,7 +157,10 @@ final class AppModel {
     }
 
     private func apply(_ progress: ScanProgress) {
-        if isScanning { scanState = .scanning(progress) }
+        guard case let .scanning(previous) = scanState else { return }
+        var progress = progress
+        progress.plan = progress.plan ?? previous.plan
+        scanState = .scanning(progress)
     }
 
     private func libraryChanged(_ change: LibraryChange) {
