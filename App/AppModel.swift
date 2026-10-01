@@ -52,6 +52,7 @@ final class AppModel {
     let library = PhotoLibraryService()
     let thumbnails: ThumbnailLoader
     private(set) var scanState: ScanState = .idle
+    private(set) var scanStartedAt = Date()
     private var review = ReviewState()
     private(set) var lastDeletion: DeletionSummary?
     private(set) var receipt: DeletionReceipt?
@@ -110,6 +111,7 @@ final class AppModel {
         guard access.canRead, !isScanning, !isErasing else { return }
         UIApplication.shared.isIdleTimerDisabled = true
         review.beginScan()
+        scanStartedAt = Date()
         scanState = .scanning(ScanProgress(stage: .listing, done: 0, total: 0))
         scanGeneration += 1
         let generation = scanGeneration

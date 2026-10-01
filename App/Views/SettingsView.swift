@@ -1,3 +1,4 @@
+import CleanupCore
 import Photos
 import SwiftUI
 
@@ -23,8 +24,8 @@ struct DeletionSummaryView: View {
             }
             if summary.count > 0 {
                 Text("Deleted items stay in Recently Deleted for 30 days. You can recover them there.")
-                if summary.bytes > 0 {
-                    Text("The \(summary.bytes.formatted(.byteCount(style: .file))) comes back when you empty Recently Deleted.")
+                if let size = ByteFormat.size(summary.bytes) {
+                    Text("The \(size) comes back when you empty Recently Deleted.")
                 }
                 Text("With iCloud Photos on, deleted items also leave your other devices.")
                 VStack(alignment: .leading, spacing: 8) {

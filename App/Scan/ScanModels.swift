@@ -48,8 +48,20 @@ extension ScreenshotKind {
     }
 }
 
+extension ScanStage {
+    var stepTitle: String {
+        switch self {
+        case .listing: "Listing photos"
+        case .sizing: "Measuring file sizes"
+        case .analyzing: "Checking photos"
+        case .reading: "Reading screenshots"
+        case .grouping: "Grouping similar shots"
+        }
+    }
+}
+
 struct ScanProgress: Sendable, Equatable {
-    enum Stage: Sendable { case listing, sizing, analyzing, reading, grouping }
+    typealias Stage = ScanStage
 
     var stage: Stage
     var done: Int
@@ -58,6 +70,8 @@ struct ScanProgress: Sendable, Equatable {
     var fraction: Double? {
         total > 0 ? Double(done) / Double(total) : nil
     }
+
+    var overall: Double { ScanPlan.overall(stage: stage, done: done, total: total) }
 
     var label: String {
         switch stage {

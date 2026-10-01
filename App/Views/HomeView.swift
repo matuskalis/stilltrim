@@ -20,9 +20,10 @@ struct HomeView: View {
                     .listRowInsets(EdgeInsets())
                 if let result = model.result, model.scanState == .finished {
                     Section {
-                        ForEach(CleanupCategory.allCases) { category in
+                        let shares = HomeSummary.barShares(CleanupCategory.allCases.map { result.reclaimableBytes(in: $0) })
+                        ForEach(Array(CleanupCategory.allCases.enumerated()), id: \.element) { index, category in
                             NavigationLink(value: category) {
-                                CategoryRow(category: category, result: result)
+                                CategoryRow(category: category, result: result, share: shares[index])
                             }
                         }
                     } footer: {
@@ -61,6 +62,45 @@ struct HomeView: View {
         }
     }
 
+    @ViewBuilder private var hero: some View {
+        let summary = HomeSummary(
+            itemCount: model.result?.totalRemovableCount ?? 0,
+            bytes: model.result?.totalReclaimableBytes ?? 0
+        )
+        switch summary {
+        case .nothing:
+            Text("Nothing to review")
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
+            Text("Stilltrim found no screenshots, similar shots, blurry photos or big videos.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+        case let .bytes(bytes):
+            heroNumber(ByteFormat.size(bytes) ?? "", caption: "to review")
+        case let .items(count):
+            heroNumber(count.formatted(), caption: count == 1 ? "item to review" : "items to review")
+        }
+        if summary != .nothing {
+            Text("Counts screenshots, extra similar shots, blurry photos and big videos. Nothing is deleted until you confirm.")
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+        }
+    }
+
+    @ViewBuilder private func heroNumber(_ number: String, caption: LocalizedStringKey) -> some View {
+        Text(number)
+            .font(.system(size: 56, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .minimumScaleFactor(0.5)
+            .lineLimit(1)
+        Text(caption)
+            .font(.title3)
+            .foregroundStyle(.secondary)
+    }
+
     @ViewBuilder private var summary: some View {
         VStack(spacing: 10) {
             switch model.scanState {
@@ -74,25 +114,11 @@ struct HomeView: View {
                     .controlSize(.large)
                     .padding(.top, 8)
             case let .scanning(progress):
-                if let fraction = progress.fraction {
-                    ProgressView(value: fraction)
-                } else {
-                    ProgressView()
-                }
-                Text(progress.label)
-                    .font(.headline)
+                ScanStatusView(progress: progress, startedAt: model.scanStartedAt)
                 Button("Cancel", role: .cancel) { model.cancelScan() }
                     .padding(.top, 4)
             case .finished:
-                let total = model.result?.totalReclaimableBytes ?? 0
-                Text(total == 0 ? "Nothing to review" : total.formatted(.byteCount(style: .file)))
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                Text(total == 0 ? "Stilltrim found no screenshots, similar shots, blurry photos or big videos." : "can be cleaned")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                hero
                 Button("Scan again") { model.startScan() }
                     .padding(.top, 4)
             case let .failed(message):
@@ -107,9 +133,27 @@ struct HomeView: View {
     }
 }
 
+/// Length shows the share of the biggest category. The size and count beside it say the same in text.
+private struct ShareBar: View {
+    let share: Double
+
+    var body: some View {
+        Capsule()
+            .fill(.quaternary)
+            .frame(height: 4)
+            .overlay(alignment: .leading) {
+                GeometryReader { proxy in
+                    Capsule().fill(.tint).frame(width: proxy.size.width * share)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 private struct CategoryRow: View {
     let category: CleanupCategory
     let result: ScanResult
+    let share: Double
 
     var body: some View {
         HStack(spacing: 14) {
@@ -117,16 +161,20 @@ private struct CategoryRow: View {
                 .font(.title3)
                 .frame(width: 30)
                 .foregroundStyle(.tint)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(category.title)
                 Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if share > 0 {
+                    ShareBar(share: share)
+                }
             }
             Spacer()
-            if bytes > 0 {
-                Text(bytes.formatted(.byteCount(style: .file)))
-                    .foregroundStyle(.secondary)
+            if let size = ByteFormat.size(bytes) {
+                Text(size)
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
             }
         }
         .padding(.vertical, 4)
