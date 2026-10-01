@@ -1,4 +1,5 @@
 import CleanupCore
+@preconcurrency import AVFoundation
 @preconcurrency import Photos
 import UIKit
 import os
@@ -29,6 +30,18 @@ struct AssetDetails: Sendable {
 
 enum ThumbnailOutcome: Sendable {
     case image(CGImage)
+    case notOnDevice
+    case failed
+}
+
+/// Carries the player item from PhotoKit's callback to the main actor, where the one player that uses it is made.
+/// The item is handed over once and never touched from two places.
+struct PlayerItemBox: @unchecked Sendable {
+    let item: AVPlayerItem
+}
+
+enum VideoOutcome: Sendable {
+    case playable(PlayerItemBox)
     case notOnDevice
     case failed
 }
@@ -119,7 +132,7 @@ actor PhotoLibraryService {
     func thumbnail(for id: String, side: CGFloat, exact: Bool) async -> ThumbnailOutcome {
         guard let asset = asset(for: id) else { return .failed }
         let manager = imageManager
-        let request = ThumbnailRequest()
+        let request = PhotoRequest(failed: ThumbnailOutcome.failed)
         let timeout = Task {
             do { try await Task.sleep(for: Self.thumbnailTimeout) } catch { return }
             if let requestID = request.cancel() { manager.cancelImageRequest(requestID) }
@@ -143,6 +156,39 @@ actor PhotoLibraryService {
                     if degraded && !inCloud { return }
                     if let cgImage = image?.cgImage, !degraded {
                         request.finish(.image(cgImage))
+                    } else {
+                        request.finish(inCloud ? .notOnDevice : .failed)
+                    }
+                }
+                if request.register(requestID) { manager.cancelImageRequest(requestID) }
+            }
+        } onCancel: {
+            if let requestID = request.cancel() { manager.cancelImageRequest(requestID) }
+        }
+    }
+
+    /// A player item for a video that is on this phone. Never downloads from iCloud: `isNetworkAccessAllowed`
+    /// stays false, and an iCloud-only video comes back as `.notOnDevice`. Ends when the task is cancelled or
+    /// after `thumbnailTimeout`, so a preview can never hang.
+    func playerItem(for id: String) async -> VideoOutcome {
+        guard let asset = asset(for: id), asset.mediaType == .video else { return .failed }
+        let manager = imageManager
+        let request = PhotoRequest(failed: VideoOutcome.failed)
+        let timeout = Task {
+            do { try await Task.sleep(for: Self.thumbnailTimeout) } catch { return }
+            if let requestID = request.cancel() { manager.cancelImageRequest(requestID) }
+        }
+        defer { timeout.cancel() }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<VideoOutcome, Never>) in
+                guard request.start(continuation) else { return }
+                let options = PHVideoRequestOptions()
+                options.deliveryMode = .automatic
+                options.isNetworkAccessAllowed = false
+                let requestID = manager.requestPlayerItem(forVideo: asset, options: options) { item, info in
+                    let inCloud = (info?[PHImageResultIsInCloudKey] as? Bool) == true
+                    if let item, !inCloud {
+                        request.finish(.playable(PlayerItemBox(item: item)))
                     } else {
                         request.finish(inCloud ? .notOnDevice : .failed)
                     }
@@ -186,26 +232,29 @@ actor PhotoLibraryService {
     }
 }
 
-/// Owns one thumbnail request and resumes its continuation exactly once, whichever comes first:
+/// Owns one thumbnail or video request and resumes its continuation exactly once, whichever comes first:
 /// the image, a cancellation or the timeout.
-private final class ThumbnailRequest: @unchecked Sendable {
+private final class PhotoRequest<Outcome: Sendable>: @unchecked Sendable {
     private struct State {
-        var continuation: CheckedContinuation<ThumbnailOutcome, Never>?
+        var continuation: CheckedContinuation<Outcome, Never>?
         var requestID: PHImageRequestID?
         var finished = false
         var cancelled = false
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
+    private let failed: Outcome
+
+    init(failed: Outcome) { self.failed = failed }
 
     /// False when the request was already cancelled: the continuation is resumed and nothing starts.
-    func start(_ continuation: CheckedContinuation<ThumbnailOutcome, Never>) -> Bool {
+    func start(_ continuation: CheckedContinuation<Outcome, Never>) -> Bool {
         let cancelled = state.withLock { state -> Bool in
             if state.cancelled { state.finished = true; return true }
             state.continuation = continuation
             return false
         }
-        if cancelled { continuation.resume(returning: .failed) }
+        if cancelled { continuation.resume(returning: failed) }
         return !cancelled
     }
 
@@ -217,8 +266,8 @@ private final class ThumbnailRequest: @unchecked Sendable {
         }
     }
 
-    func finish(_ outcome: ThumbnailOutcome) {
-        let continuation = state.withLock { state -> CheckedContinuation<ThumbnailOutcome, Never>? in
+    func finish(_ outcome: Outcome) {
+        let continuation = state.withLock { state -> CheckedContinuation<Outcome, Never>? in
             guard !state.finished else { return nil }
             state.finished = true
             let continuation = state.continuation
@@ -234,7 +283,7 @@ private final class ThumbnailRequest: @unchecked Sendable {
             state.cancelled = true
             return state.requestID
         }
-        finish(.failed)
+        finish(failed)
         return requestID
     }
 }

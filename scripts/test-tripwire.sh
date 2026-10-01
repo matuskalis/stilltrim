@@ -63,6 +63,7 @@ expect c18_widget_target          FAIL 'perl -0pi -e "s/\nschemes:/\n  Widget:\n
 expect c19_sdk_dependency         FAIL 'add_project_line "      - sdk: Network.framework" "$DEPENDENCY_ANCHOR"'
 expect c20_framework_dependency   FAIL 'add_project_line "      - framework: Vendor.xcframework" "$DEPENDENCY_ANCHOR"'
 expect c21_model_file             FAIL 'mkdir -p App/Models && printf x > App/Models/Clf.mlmodelc'
+expect c29_import_AVKit_allowed   PASS 'printf "import AVKit\nimport AVFoundation\n" > App/Playback.swift'
 expect c6_URL_init_split_literal  PASS 'printf "import Foundation\nlet u = URL.init(string: \"ht\" + \"tps://example.com\")\n" > App/Evil.swift' known-gap
 expect c22_second_import_after_semicolon FAIL 'printf "import Foundation; import MapKit\n" > App/Evil.swift'
 expect c23_import_after_comment   FAIL 'printf "/* x */ import MapKit\n" > App/Evil.swift'
@@ -106,6 +107,8 @@ build_fixture socket 'import Foundation
 public func f() -> Int32 { socket(AF_INET, SOCK_STREAM, 0) }'
 build_fixture cfnetwork 'import Foundation
 public func f() -> AnyObject { URLSession.shared }'
+build_fixture avkit 'import AVKit
+public func f() -> AnyObject { AVPlayerView() }'
 build_fixture outside 'import MapKit
 public func f() -> AnyObject { MKMapView() }'
 
@@ -117,6 +120,7 @@ mkdir -p "$FIXTURES/embedded.app/Frameworks/Vendor.framework"
 expect_app b1_clean_app_passes          0 "$FIXTURES/clean.app"
 expect_app b2_socket_symbol             1 "$FIXTURES/socket.app"
 expect_app b3_links_CFNetwork           1 "$FIXTURES/cfnetwork.app"
+expect_app b8_links_AVKit_passes        0 "$FIXTURES/avkit.app"
 expect_app b4_library_outside_allowlist 1 "$FIXTURES/outside.app"
 expect_app b5_unreadable_binary         1 "$FIXTURES/unreadable.app"
 expect_app b6_embedded_frameworks       1 "$FIXTURES/embedded.app"

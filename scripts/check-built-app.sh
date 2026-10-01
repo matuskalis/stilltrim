@@ -10,7 +10,10 @@ app="${1:?usage: check-built-app.sh <path to .app>}"
 DENY_LINK='Network\.framework|CFNetwork\.framework|WebKit\.framework|SafariServices\.framework|AdSupport\.framework|AppTrackingTransparency\.framework|StoreKit\.framework|CloudKit\.framework|MessageUI\.framework'
 # Libraries a binary may bind symbols from: local Apple frameworks only, no networking-capable one. A new framework is a
 # deliberate edit of this list. Keep it in step with ALLOWED_IMPORTS in scripts/check-no-network.sh.
-ALLOW_LIBS='^(SwiftUI|Foundation|Photos|UIKit|CoreGraphics|Vision|Accelerate|CoreFoundation|PhotosUI|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers|libobjc|libSystem|libswift.*|libc\+\+.*|DeveloperToolsSupport)$'
+# AVKit and AVFoundation (with their overlay and audio libraries _AVKit_SwiftUI and AVFAudio) are allowed on purpose, for local video preview only: playback goes through
+# PHImageManager player items with network access off, and the code never builds a URL. The deny lists
+# still catch every networking framework and symbol.
+ALLOW_LIBS='^(SwiftUI|Foundation|Photos|UIKit|CoreGraphics|Vision|AVKit|_AVKit_SwiftUI|AVFoundation|AVFAudio|Accelerate|CoreFoundation|PhotosUI|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers|libobjc|libSystem|libswift.*|libc\+\+.*|DeveloperToolsSupport)$'
 DENY_SYMS='_OBJC_CLASS_\$_(NSURLSession|NSURLConnection|NSURLRequest|NSMutableURLRequest|NSURLDownload|NSNetService|NSNetServiceBrowser|NSUbiquitousKeyValueStore|WKWebView|SFSafariViewController|UIPasteboard|UIActivityViewController)$|\$s7SwiftUI10AsyncImage|^_(socket|connect|bind|listen|accept|sendto|recvfrom|getaddrinfo|gethostbyname|CFStreamCreatePairWithSocketToHost|CFHostCreateWithName|CFSocketCreate|nw_connection_create|nw_listener_create)$'
 failed=0
 
