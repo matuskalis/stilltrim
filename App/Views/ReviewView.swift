@@ -1,9 +1,11 @@
+import AVKit
 import CleanupCore
 import SwiftUI
 import UIKit
 
 private struct PreviewTarget: Identifiable {
     let id: String
+    let isVideo: Bool
 }
 
 private let scrollSpace = "review-scroll"
@@ -104,7 +106,7 @@ struct ReviewView: View {
                     .disabled(bulkAction == .none)
             }
         }
-        .sheet(item: $preview) { PreviewView(id: $0.id) }
+        .sheet(item: $preview) { PreviewView(id: $0.id, isVideo: $0.isVideo) }
         .sheet(item: $explainedBatch) { DeletionSummaryView(summary: $0) }
         .onChange(of: model.receipt) { _, receipt in
             if let receipt { UIAccessibility.post(notification: .announcement, argument: receipt.spokenText) }
@@ -293,7 +295,7 @@ struct ReviewView: View {
         }
         .onDisappear { tracker.forget(item.id) }
         .contextMenu {
-            Button("Preview", systemImage: "eye") { preview = PreviewTarget(id: item.id) }
+            Button("Preview", systemImage: "eye") { preview = PreviewTarget(id: item.id, isVideo: item.duration != nil) }
             if !item.isKeeper {
                 Button("Keep, do not show again", systemImage: "heart") {
                     Task { await model.keep(ids: [item.id]) }
@@ -542,9 +544,12 @@ private struct PhotoCell: View {
 
 private struct PreviewView: View {
     let id: String
+    let isVideo: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var image: CGImage?
+    @State private var player: AVPlayer?
     @State private var finished = false
 
     var body: some View {
@@ -554,10 +559,13 @@ private struct PreviewView: View {
                     Image(decorative: image, scale: 1)
                         .resizable()
                         .scaledToFit()
+                } else if let player {
+                    VideoPlayer(player: player)
+                        .ignoresSafeArea(edges: .bottom)
                 } else if finished {
                     ContentUnavailableView(
                         "Not on this phone", systemImage: "icloud",
-                        description: Text("This photo is only in iCloud. The app never downloads photos.")
+                        description: Text("This \(isVideo ? "video" : "photo") is only in iCloud. The app never downloads from iCloud.")
                     )
                 } else {
                     ProgressView()
@@ -568,9 +576,26 @@ private struct PreviewView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .task {
-                image = await model.thumbnails.image(for: id, side: 1600)
+                if isVideo {
+                    await loadVideo()
+                } else {
+                    image = await model.thumbnails.image(for: id, side: 1600)
+                }
                 finished = true
             }
+            .onDisappear { player?.pause() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { player?.pause() }
+            }
         }
+    }
+
+    private func loadVideo() async {
+        guard case let .playable(box) = await model.library.playerItem(for: id) else { return }
+        // Follows the silent switch and mixes with other audio, so a preview never blasts sound.
+        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+        let player = AVPlayer(playerItem: box.item)
+        self.player = player
+        player.play()
     }
 }

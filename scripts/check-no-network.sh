@@ -42,7 +42,10 @@ fi
 
 # 2a. Import allow-list: a new framework is a deliberate edit of this list.
 # Keep in step with ALLOW_LIBS in scripts/check-built-app.sh (the libraries the built binary may bind).
-ALLOWED_IMPORTS='Foundation|SwiftUI|UIKit|Photos|PhotosUI|Vision|CoreGraphics|Accelerate|Observation|os|CleanupCore|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers'
+# AVKit and AVFoundation are allowed on purpose, for local video preview only: playback goes through
+# PHImageManager player items with isNetworkAccessAllowed = false, and the code never builds a URL
+# (rules 2 and 3 reject URL(string:), NSURL and https literals).
+ALLOWED_IMPORTS='Foundation|SwiftUI|UIKit|Photos|PhotosUI|Vision|AVKit|AVFoundation|CoreGraphics|Accelerate|Observation|os|CleanupCore|QuartzCore|ImageIO|CoreImage|CoreText|UniformTypeIdentifiers'
 # An import at the start of a line, or after a ";" or a "*/" on the same line.
 hits=$(grep -rnE --include='*.swift' '(^|;|\*/)[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+' $SOURCES | perl -ne 'my ($where, $code) = /^([^:]+:\d+):(.*)$/s or next; while ($code =~ /(?:^|;|\*\/)\s*(?:@\w+\s+)*import\s+(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(\w+)/g) { print "$1 $where\n" }' | awk -v allow="^($ALLOWED_IMPORTS)$" '$1 !~ allow' || true)
 if [ -n "$hits" ]; then
