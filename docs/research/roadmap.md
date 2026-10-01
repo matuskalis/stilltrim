@@ -14,11 +14,12 @@ Synthesis of the round described in `feature-brief.md`. The raw agent reports st
 - 1 Oct: receipt strip after the first delete of a launch, a safer-first delete bar ("Delete N above" is the prominent one), and a transit-time rule so a flicked-past row never counts as seen.
 - 1 Oct: keeper rule v2 (rank by the still's bytes, size and sharpness vote only past a margin, "Close call" label, reason line). Close calls keep today's suggestions: unticking near-equal contenders is an owner decision.
 - 1 Oct: Home reads "N to review" with a scope line and share bars; one scan progress with a step rail; groups of two and three as large tiles with quiet headers; Delete above returns to the group header.
+- 1 Oct (evening): a video or screen recording plays in Preview through a local player item (network off); a finger swipe across photos selects them in the plain grids (a UIKit recognizer, since a SwiftUI drag gesture stopped the list scrolling; favourites and edited photos are skipped); the scan shows an estimated time left instead of an elapsed clock (priors are placeholders until measured on a phone).
 - 30 Sep and 1 Oct: selection mark that keeps 3:1 contrast on any photo, one red in Settings, three haptic patterns.
 
 ## Build next (ranked)
 
-1. Fewer groups to inspect (biggest review-speed lever left): sort by gain, clear-wins tiers, "Delete extras" per group, range select.
+1. Fewer groups to inspect (biggest review-speed lever left): sort by gain, clear-wins tiers, "Delete extras" per group.
 2. Home hierarchy leftovers: toolbar rescan, inline title, quieter unit run; locked rows while a scan step runs; real stage weights from a phone timing.
 3. Spend red only on "goes" (owner decision 2), then the contact-strip look if the proof-sheet direction is chosen.
 4. Screenshots: a "Select older than" menu per heading and a one-time-code chip (rule 4 unchanged), then the Kinds check (counts-only labelling on the phone) to measure real accuracy.
