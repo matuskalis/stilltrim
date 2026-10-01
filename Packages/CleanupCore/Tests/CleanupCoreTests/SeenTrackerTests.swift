@@ -4,10 +4,10 @@ import XCTest
 
 final class SeenTrackerTests: XCTestCase {
     private let start = ContinuousClock.now
-    private let longer = SeenTracker.dwell + .milliseconds(50)
-    private let shorter = SeenTracker.dwell - .milliseconds(50)
+    private let longer = Duration.milliseconds(1200)
+    private let shorter = Duration.milliseconds(300)
 
-    func testPhotoThatLeftWithinTheDwellTimeIsNotSeen() {
+    func testPhotoThatFlickedThroughInUnderTheMinimumTransitIsNotSeen() {
         var tracker = SeenTracker()
         tracker.appeared("a", at: start)
         tracker.scrolledPast("a", at: start + shorter)

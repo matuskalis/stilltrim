@@ -13,7 +13,7 @@ private enum CellPosition {
 }
 
 /// What the list has reported about each photo it drew. A photo counts as scrolled past only when it was
-/// on screen for the dwell time (`SeenTracker`) and then left through the top, so rows a flick skipped, or
+/// crossing the visible area in at least the minimum transit time (`SeenTracker`) and then left through the top, so rows a flick skipped, or
 /// only showed for a few frames, are never included. The first reported photo that is not scrolled past, in
 /// display order, is where the user is. Only the delete bar reads this, so scrolling never re-evaluates the
 /// grid. Scroll position bindings were tried instead and froze the app on a list of a few dozen groups.
@@ -21,7 +21,9 @@ private enum CellPosition {
 private final class ScrollTracker {
     private(set) var scrolledPast: Set<String> = []
     private(set) var notScrolledPast: Set<String> = []
-    @ObservationIgnored var viewportHeight = CGFloat.infinity
+    /// The part of the list the user can see: below the navigation bar, above the delete bar and receipt strip.
+    @ObservationIgnored var visibleTop = CGFloat.zero
+    @ObservationIgnored var visibleBottom = CGFloat.infinity
     @ObservationIgnored private var dwell = SeenTracker()
 
     func update(_ id: String, _ position: CellPosition) {
@@ -144,7 +146,9 @@ struct ReviewView: View {
             }
         }
         .coordinateSpace(.named(scrollSpace))
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tracker.viewportHeight = $0 }
+        .onGeometryChange(for: ClosedRange<CGFloat>.self) { proxy in
+            proxy.safeAreaInsets.top...max(proxy.safeAreaInsets.top, proxy.size.height - proxy.safeAreaInsets.bottom)
+        } action: { tracker.visibleTop = $0.lowerBound; tracker.visibleBottom = $0.upperBound }
     }
 
     @ViewBuilder private func leftOutCaption(_ count: Int) -> some View {
@@ -227,8 +231,8 @@ struct ReviewView: View {
         .accessibilityIdentifier("cell-\(item.id)")
         .onGeometryChange(for: CellPosition.self) { proxy in
             let frame = proxy.frame(in: .named(scrollSpace))
-            if frame.maxY <= 0 { return .above }
-            return frame.minY >= tracker.viewportHeight ? .below : .onScreen
+            if frame.maxY <= tracker.visibleTop { return .above }
+            return frame.minY >= tracker.visibleBottom ? .below : .onScreen
         } action: { position in
             tracker.update(item.id, position)
         }
