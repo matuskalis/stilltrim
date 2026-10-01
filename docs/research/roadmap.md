@@ -45,7 +45,7 @@ Synthesis of the round described in `feature-brief.md`. The raw agent reports st
 9. Hero wording: "to review", not "can be cleaned".
 10. Kinds check as a debug-only screen, counts only. Yes.
 11. Hide photos whose original is only in iCloud, after the device check. Yes.
-12. Best-shot: may a "close call" group start unticked, which tightens rule 4 a little? Recommend yes.
+12. Best-shot contender protection: should the photos a Best does not clearly beat start unticked? It protects against a coin-flip Best but a burst of near-identical frames then starts with nothing ticked, which slows review. Shipped as a label only ("Close call"); recommend measuring on real groups first.
 13. Best-shot: may the cache hold a few face numbers (eye openness), and may the scan read group members at 1,024 px for it? Recommend yes, numbers only, no images.
 
 ## Not doing

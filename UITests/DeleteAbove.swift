@@ -38,11 +38,11 @@ final class DeleteAbove: SimulatorOnlyTestCase {
         XCTAssertTrue(title.label.hasPrefix("\(above) "), "deleted a different number than the button said: \(title.label)")
         app.buttons["Done"].tap()
 
-        // The list goes back to the photo the user was at. It may sit a little lower afterwards, never higher:
-        // higher would mean unreviewed photos slid past unseen.
+        // The list goes back to the first photo that was fully on screen and puts it at the top, below the bar.
+        // Hidden under the bar would mean unreviewed photos slid past unseen.
         let same = app.buttons[watched.id]
         XCTAssertTrue(same.waitForExistence(timeout: 15), "the photo at the top of the screen was deleted or scrolled away")
-        XCTAssertGreaterThanOrEqual(same.frame.minY, watched.minY - 24, "the list jumped forward after deleting")
+        XCTAssertGreaterThanOrEqual(same.frame.minY, 100, "the list jumped forward after deleting: the photo that was on screen is hidden under the bar")
         XCTAssertLessThan(same.frame.minY, watched.minY + 200, "the list jumped back by more than a row")
     }
 

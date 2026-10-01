@@ -121,7 +121,9 @@ public struct SimilarityGroup: Sendable, Equatable {
     public let memberIDs: [String]
     /// Members from best to worst, keeper first.
     public let rankedMemberIDs: [String]
-    /// Everything except the keeper, favourites and edited photos. Empty for a close call.
+    /// Everything except the keeper, favourites and edited photos, close call or not. Leaving the near-equal
+    /// contenders unticked would protect against a coin-flip Best but starts a burst of near-identical frames with
+    /// nothing ticked, which costs review time: that is an owner decision, so a close call only carries a label.
     public let suggestedRemovalIDs: [String]
     public let keeperReason: KeeperReason
     public let confidence: KeeperConfidence
@@ -201,7 +203,7 @@ public enum SimilarityGrouper {
             keeperID: keeper.id,
             memberIDs: members.map(\.id),
             rankedMemberIDs: ranked.map(\.id),
-            suggestedRemovalIDs: isClose ? [] : members
+            suggestedRemovalIDs: members
                 .filter { $0.id != keeper.id && !$0.isFavorite && !$0.isEdited }
                 .map(\.id),
             keeperReason: keeperReason,
@@ -213,7 +215,7 @@ public enum SimilarityGrouper {
         )
     }
 
-    private static let closeCallLine = "Close call. These look equally good. One is marked Best."
+    private static let closeCallLine = "Close call. Check these before deleting. One is marked Best."
 
     private static func reasonLine(
         keeper: GroupingItem, runnerUp: GroupingItem, others: ArraySlice<GroupingItem>, reason: KeeperReason

@@ -36,7 +36,7 @@ import Testing
         #expect(result.keeperID == "b")
         #expect(result.keeperReason == .tie)
         #expect(result.confidence == .close)
-        #expect(result.suggestedRemovalIDs.isEmpty)
+        #expect(Set(result.suggestedRemovalIDs) == Set(result.memberIDs).subtracting([result.keeperID]), "a close call keeps today's suggestions")
         #expect(result.contenderIDs == ["a"])
         #expect(result.reasonLine.hasPrefix("Close call."))
     }
@@ -85,7 +85,7 @@ import Testing
         #expect(result.keeperID == "big-soft")
         #expect(result.keeperReason == .size)
         #expect(result.confidence == .close)
-        #expect(result.suggestedRemovalIDs.isEmpty)
+        #expect(Set(result.suggestedRemovalIDs) == Set(result.memberIDs).subtracting([result.keeperID]), "a close call keeps today's suggestions")
     }
 
     @Test func overlayCopyThatSharpnessContradictsIsFlaggedClose() {
@@ -94,7 +94,7 @@ import Testing
             item("sticker", seconds: 1, bytes: 3_300_000, sharpness: 0.8),
         ])
         #expect(result.confidence == .close)
-        #expect(result.suggestedRemovalIDs.isEmpty)
+        #expect(Set(result.suggestedRemovalIDs) == Set(result.memberIDs).subtracting([result.keeperID]), "a close call keeps today's suggestions")
     }
 
     @Test func stillBytesBeatTheAssetTotal() {
@@ -131,7 +131,7 @@ import Testing
         #expect(result.keeperID == "open")
         #expect(result.keeperReason == .eyes)
         #expect(result.confidence == .close)
-        #expect(result.suggestedRemovalIDs.isEmpty)
+        #expect(Set(result.suggestedRemovalIDs) == Set(result.memberIDs).subtracting([result.keeperID]), "a close call keeps today's suggestions")
     }
 
     @Test func eyesAndSizeAgreeingIsClear() {
@@ -179,7 +179,7 @@ import Testing
         ])
         #expect(result.keeperID == "best")
         #expect(result.contenderIDs == ["contender"])
-        #expect(result.suggestedRemovalIDs.isEmpty)
+        #expect(Set(result.suggestedRemovalIDs) == Set(result.memberIDs).subtracting([result.keeperID]), "a close call keeps today's suggestions")
     }
 
     @Test func keeperDoesNotDependOnInputOrder() {

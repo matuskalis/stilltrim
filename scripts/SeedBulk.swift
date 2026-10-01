@@ -1,6 +1,6 @@
 // Generates N small JPEGs into folder argument 2 from the photos in argument 1, for scale tests.
 // About one in six is a near-duplicate of the photo before it. With the argument "pairs", every second photo is an
-// exposure-shifted full-frame copy of the one before it, so the similar list holds count / 2 groups even with the
+// blurred full-frame copy of the one before it, so the similar list holds count / 2 groups even with the
 // Simulator's stand-in fingerprint. Run through scripts/seed-bulk.sh.
 import CoreGraphics
 import CoreImage
@@ -49,6 +49,14 @@ func variant(of source: CGImage, crop: Double, ev: Float) -> CGImage {
     return ciContext.createCGImage(scaled, from: scaled.extent.integral)!
 }
 
+func blurred(_ image: CGImage, sigma: Double) -> CGImage {
+    let input = CIImage(cgImage: image)
+    let filter = CIFilter.gaussianBlur()
+    filter.inputImage = input.clampedToExtent()
+    filter.radius = Float(sigma)
+    return ciContext.createCGImage(filter.outputImage!.cropped(to: input.extent), from: input.extent)!
+}
+
 func write(_ image: CGImage, index: Int, seconds: Int) {
     let url = URL(fileURLWithPath: "\(out)/bulk\(String(format: "%05d", index)).jpg")
     let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)!
@@ -69,7 +77,9 @@ for index in 0..<count {
         let isCopy = index % 2 == 1
         if !isCopy { pairSource = Int.random(in: 0..<sources.count, using: &rng) }
         clock += isCopy ? Int.random(in: 2...40, using: &rng) : Int.random(in: 600...30_000, using: &rng)
-        write(variant(of: sources[pairSource], crop: 1, ev: isCopy ? Float.random(in: 0.15...0.3, using: &rng) : 0), index: index, seconds: clock)
+        // The copy is a blurred duplicate, so the keeper rule has a clear winner and the copy starts ticked.
+        let image = variant(of: sources[pairSource], crop: 1, ev: isCopy ? Float.random(in: 0.1...0.2, using: &rng) : 0)
+        write(isCopy ? blurred(image, sigma: 2.5) : image, index: index, seconds: clock)
         continue
     }
     if let previous, Int.random(in: 0..<6, using: &rng) == 0 {
