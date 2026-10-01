@@ -11,12 +11,16 @@ Synthesis of the round described in `feature-brief.md`. The raw agent reports st
 - Copy that matches the code: promise wording, Done sheet, permission path (HIG), plurals, states.
 - Tools: `scripts/classify-folder.sh` (classify real screenshots on the Mac), `seed-bulk.sh ... pairs` (long similar list).
 - Checked on the simulator: a 349 photo delete leaves the rest of the list in place.
+- 1 Oct: receipt strip after the first delete of a launch, a safer-first delete bar ("Delete N above" is the prominent one), and a transit-time rule so a flicked-past row never counts as seen.
+- 1 Oct: keeper rule v2 (rank by the still's bytes, size and sharpness vote only past a margin, "Close call" label, reason line). Close calls keep today's suggestions: unticking near-equal contenders is an owner decision.
+- 1 Oct: Home reads "N to review" with a scope line and share bars; one scan progress with a step rail; groups of two and three as large tiles with quiet headers; Delete above returns to the group header.
+- 30 Sep and 1 Oct: selection mark that keeps 3:1 contrast on any photo, one red in Settings, three haptic patterns.
 
 ## Build next (ranked)
 
-1. Design step 1 (in flight): photo-independent selection mark, one red, three haptic patterns.
-2. Review speed: receipt strip instead of the full Done sheet after every batch, bar v2 with the safer button first, "seen, not just passed" (a dwell time) for Delete above. Biggest lever is fewer groups to inspect: sort by gain, then clear-wins tiers with best-shot work.
-3. Home and scan: a hero that says "to review" plus a scope line, a breakdown that works with one accent, one scan progress that never restarts, locked rows while a step runs.
+1. Fewer groups to inspect (biggest review-speed lever left): sort by gain, clear-wins tiers, "Delete extras" per group, range select.
+2. Home hierarchy leftovers: toolbar rescan, inline title, quieter unit run; locked rows while a scan step runs; real stage weights from a phone timing.
+3. Spend red only on "goes" (owner decision 2), then the contact-strip look if the proof-sheet direction is chosen.
 4. Screenshots: a "Select older than" menu per heading and a one-time-code chip (rule 4 unchanged), then the Kinds check (counts-only labelling on the phone) to measure real accuracy.
 5. Group layout: pairs and triples as large tiles, the contact-strip header, a consistent radius and spacing token set.
 6. Best-shot (measured, see the local best-shot report): rank by the bytes of the still only (today Live Photo video and RAW count as detail), let file size and sharpness vote only when their gap clears a margin and call the rest a "close call", add an eyes-open signal from face landmarks, show a reason line under the group. The 16 of 16 result holds with no new data.
