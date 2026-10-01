@@ -171,7 +171,8 @@ struct ReviewView: View {
             result.similarGroups.map { group in
                 ReviewSection(
                     id: "group-\(group.id)",
-                    title: "\(group.items.count) similar · \(group.reclaimableBytes.formatted(.byteCount(style: .file))) to gain",
+                    title: "\(group.items.count) similar · \(group.reclaimableBytes.formatted(.byteCount(style: .file))) to gain"
+                        + (group.reasonLine.map { "\n\($0)" } ?? ""),
                     items: group.items, bulkSelectableIDs: []
                 )
             }

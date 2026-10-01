@@ -105,7 +105,7 @@ struct ScanPipeline: Sendable {
         for records: [AssetRecord], entries: inout [String: AnalysisCache.Entry],
         progress: @Sendable (ScanProgress) -> Void
     ) async throws {
-        let missing = records.filter { entries[$0.id] == nil }
+        let missing = records.filter { entries[$0.id] == nil || (entries[$0.id]?.stillBytes == nil && $0.kind == .photo) }
         var done = 0
         for start in stride(from: 0, to: missing.count, by: Self.sizingBatch) {
             try Task.checkCancellation()
@@ -113,10 +113,11 @@ struct ScanPipeline: Sendable {
             let details = await library.details(for: batch.map(\.id))
             for record in batch {
                 let detail = details[record.id]
-                let entry = AnalysisCache.Entry(
+                var entry = entries[record.id] ?? AnalysisCache.Entry(
                     modificationDate: record.modificationDate, byteSize: detail?.byteSize ?? 0,
                     isEdited: detail?.isEdited ?? false, metrics: nil, fingerprint: nil
                 )
+                entry.stillBytes = detail?.stillBytes ?? 0
                 entries[record.id] = entry
                 await cache.store(entry, for: record.id)
             }
@@ -244,7 +245,8 @@ struct ScanPipeline: Sendable {
             groupingItems.append(GroupingItem(
                 id: record.id, creationDate: record.creationDate, fingerprint: fingerprint,
                 isFavorite: record.isFavorite, isEdited: entry.isEdited,
-                pixelCount: record.pixelCount, byteSize: entry.byteSize
+                pixelCount: record.pixelCount, byteSize: entry.byteSize,
+                stillBytes: entry.stillBytes, sharpness: entry.metrics?.fineToCoarse
             ))
         }
         return SimilarityGrouper.groups(from: groupingItems).map { group in
@@ -254,7 +256,7 @@ struct ScanPipeline: Sendable {
             }
             return SimilarGroup(
                 id: group.keeperID, items: items, suggestedRemovalIDs: Set(group.suggestedRemovalIDs),
-                rankedIDs: group.rankedMemberIDs
+                rankedIDs: group.rankedMemberIDs, confidence: group.confidence, reasonLine: group.reasonLine
             )
         }
     }

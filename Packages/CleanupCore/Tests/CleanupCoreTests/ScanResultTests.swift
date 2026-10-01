@@ -52,6 +52,18 @@ import Testing
         #expect(remaining.id == "k", "the group keeps its identity")
     }
 
+    @Test func theReasonSurvivesRemovalUntilTheBestPhotoGoes() throws {
+        let base = group()
+        let withReason = SimilarGroup(
+            id: base.id, items: base.items, suggestedRemovalIDs: base.suggestedRemovalIDs, rankedIDs: base.rankedIDs,
+            confidence: .close, reasonLine: "Close call."
+        )
+        let kept = try #require(withReason.removing(["b"]))
+        #expect(kept.reasonLine == "Close call." && kept.confidence == .close)
+        let promoted = try #require(withReason.removing(["k"]))
+        #expect(promoted.reasonLine == nil)
+    }
+
     @Test func aGroupDownToOnePhotoDisappears() {
         #expect(result.removing(ids: ["a", "b", "c"]).similarGroups.isEmpty)
         #expect(result.removing(ids: ["k", "a", "b"]).similarGroups.isEmpty)
