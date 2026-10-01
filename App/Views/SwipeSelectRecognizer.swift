@@ -1,3 +1,4 @@
+import CleanupCore
 import SwiftUI
 import UIKit
 
@@ -6,6 +7,7 @@ import UIKit
 /// from scrolling (measured on iOS 26.1, 1 Oct 2026), so this is a UIKit pan recognizer on the list's scroll view.
 /// The list's own pan waits for it to fail, which it does at once for a drag that starts more down than across or
 /// off a photo. Once it begins, the touches of the buttons under it are cancelled, so a swipe never also taps.
+/// A finger near the top or bottom edge scrolls the list on, also while it is still, like the Photos app.
 /// Points are in the space the photos report their frames in: the scroll view's content area, with the scroll
 /// offset and the top safe area taken out.
 struct SwipeSelectRecognizer: UIViewRepresentable {
@@ -51,6 +53,8 @@ struct SwipeSelectRecognizer: UIViewRepresentable {
         var handlers: SwipeSelectRecognizer?
         private weak var scrollView: UIScrollView?
         private let pan = TouchDownPan()
+        private var displayLink: CADisplayLink?
+        private var lastTick: CFTimeInterval = 0
 
         override init() {
             super.init()
@@ -68,6 +72,7 @@ struct SwipeSelectRecognizer: UIViewRepresentable {
         }
 
         func uninstall() {
+            stopAutoScroll()
             scrollView?.removeGestureRecognizer(pan)
             scrollView = nil
         }
@@ -83,11 +88,46 @@ struct SwipeSelectRecognizer: UIViewRepresentable {
             guard let scrollView, let handlers else { return }
             let location = placed(recognizer.location(in: scrollView), in: scrollView)
             switch recognizer.state {
-            case .began: handlers.began(placed(pan.touchDown, in: scrollView), location)
-            case .changed: handlers.moved(location)
-            case .ended, .cancelled, .failed: handlers.ended()
+            case .began:
+                handlers.began(placed(pan.touchDown, in: scrollView), location)
+                startAutoScroll()
+            case .changed:
+                handlers.moved(location)
+            case .ended, .cancelled, .failed:
+                stopAutoScroll()
+                handlers.ended()
             default: break
             }
+        }
+
+        private func startAutoScroll() {
+            guard displayLink == nil else { return }
+            let link = CADisplayLink(target: self, selector: #selector(autoScroll))
+            lastTick = CACurrentMediaTime()
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
+
+        private func stopAutoScroll() {
+            displayLink?.invalidate()
+            displayLink = nil
+        }
+
+        /// Moves the list while the finger is in an edge zone, then re-reads the photo under the finger: the photos
+        /// moved, the finger did not.
+        @objc private func autoScroll(_ link: CADisplayLink) {
+            guard let scrollView, let handlers else { return stopAutoScroll() }
+            let elapsed = min(max(link.timestamp - lastTick, 0), 0.05)
+            lastTick = link.timestamp
+            let inset = scrollView.adjustedContentInset
+            let fingerY = pan.location(in: scrollView).y - scrollView.contentOffset.y
+            let speed = EdgeScroll.velocity(y: fingerY, top: inset.top, bottom: scrollView.bounds.height - inset.bottom)
+            let lowest = -inset.top
+            let highest = max(scrollView.contentSize.height - scrollView.bounds.height + inset.bottom, lowest)
+            let target = min(max(scrollView.contentOffset.y + speed * elapsed, lowest), highest)
+            guard speed != 0, target != scrollView.contentOffset.y else { return }
+            scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: target), animated: false)
+            handlers.moved(placed(pan.location(in: scrollView), in: scrollView))
         }
 
         /// A point of the scroll view's bounds in the space the photos report their frames in.

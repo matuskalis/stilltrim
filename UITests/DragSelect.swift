@@ -43,6 +43,31 @@ final class DragSelect: SimulatorOnlyTestCase {
         XCTAssertEqual(selectedIDs(in: cells), [id], "a swipe inside one photo did not select it exactly once")
     }
 
+    /// Like the Photos app: a finger that drags a selection to the bottom edge scrolls the list on and keeps selecting.
+    @MainActor
+    func testDraggingASelectionToTheBottomEdgeScrollsTheList() throws {
+        let (app, cells) = openBlurryAndDark()
+        let lowestBottom = cells.allElementsBoundByIndex.map(\.frame.maxY).max() ?? 0
+        try XCTSkipIf(lowestBottom <= app.frame.height, "the list fits on one screen")
+        let all = cells.allElementsBoundByIndex.sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) }
+        let first = try XCTUnwrap(all.first)
+        let firstID = first.identifier
+        let startY = first.frame.minY
+        // The first photo of the lowest row whose middle is on screen, dragged across and down into the bottom edge zone.
+        // The drag must be more across than down, or the list takes it as a scroll, and it ends over the second column,
+        // which every row has.
+        let lowestRowTop = try XCTUnwrap(all.filter { $0.frame.midY < app.frame.height - 100 }.last).frame.minY
+        let start = try XCTUnwrap(all.first { $0.frame.minY == lowestRowTop })
+        let from = start.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.96))
+
+        from.press(forDuration: 0.1, thenDragTo: edge, withVelocity: .default, thenHoldForDuration: 2)
+
+        let moved = app.buttons[firstID]
+        XCTAssertTrue(!moved.exists || moved.frame.minY < startY - 100, "the list did not scroll while the finger sat at the bottom edge")
+        XCTAssertGreaterThan(selectedIDs(in: cells).count, 3, "the selection did not follow the list as it scrolled")
+    }
+
     /// The measured failure this guards: a SwiftUI drag gesture on the grid stopped the list scrolling.
     @MainActor
     func testVerticalSwipesStillScrollAndSelectNothing() throws {
