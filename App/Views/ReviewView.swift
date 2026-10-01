@@ -1,5 +1,6 @@
 import CleanupCore
 import SwiftUI
+import UIKit
 
 private struct PreviewTarget: Identifiable {
     let id: String
@@ -7,30 +8,43 @@ private struct PreviewTarget: Identifiable {
 
 private let scrollSpace = "review-scroll"
 
-/// What the list has reported about each photo it drew: fully above the top edge (scrolled past) or not.
-/// The first reported photo that is not scrolled past, in display order, is where the user is. Only photos
-/// reported as scrolled past can be deleted above it, so rows a fast flick skipped without ever drawing
-/// them are never included. Only the delete bar reads this, so scrolling never re-evaluates the grid.
-/// Scroll position bindings were tried instead and froze the app on a list of a few dozen groups.
+private enum CellPosition {
+    case above, onScreen, below
+}
+
+/// What the list has reported about each photo it drew. A photo counts as scrolled past only when it was
+/// on screen for the dwell time (`SeenTracker`) and then left through the top, so rows a flick skipped, or
+/// only showed for a few frames, are never included. The first reported photo that is not scrolled past, in
+/// display order, is where the user is. Only the delete bar reads this, so scrolling never re-evaluates the
+/// grid. Scroll position bindings were tried instead and froze the app on a list of a few dozen groups.
 @MainActor @Observable
 private final class ScrollTracker {
     private(set) var scrolledPast: Set<String> = []
     private(set) var notScrolledPast: Set<String> = []
+    @ObservationIgnored var viewportHeight = CGFloat.infinity
+    @ObservationIgnored private var dwell = SeenTracker()
 
-    func update(_ id: String, scrolledPast isPast: Bool) {
-        if isPast {
+    func update(_ id: String, _ position: CellPosition) {
+        let wasSeen = dwell.seen.contains(id)
+        switch position {
+        case .above:
             notScrolledPast.remove(id)
-            scrolledPast.insert(id)
-        } else {
-            scrolledPast.remove(id)
+            dwell.scrolledPast(id, at: .now)
+        case .onScreen:
             notScrolledPast.insert(id)
+            dwell.appeared(id, at: .now)
+        case .below:
+            notScrolledPast.insert(id)
+            dwell.disappeared(id)
         }
+        if dwell.seen.contains(id) != wasSeen { scrolledPast = dwell.seen }
     }
 
     /// A photo that left the screen without a last report is unknown again, so a hard flick cannot leave
     /// it pinned as "not scrolled past" at the top of the list.
     func forget(_ id: String) {
         if notScrolledPast.contains(id) { notScrolledPast.remove(id) }
+        dwell.disappeared(id)
     }
 }
 
@@ -48,6 +62,7 @@ struct ReviewView: View {
     let category: CleanupCategory
     @Environment(AppModel.self) private var model
     @State private var preview: PreviewTarget?
+    @State private var explainedBatch: DeletionSummary?
     @State private var tracker = ScrollTracker()
     @State private var selectTicks = 0
     @State private var bulkSelects = 0
@@ -58,13 +73,18 @@ struct ReviewView: View {
     var body: some View {
         ScrollViewReader { proxy in
             list
-                .safeAreaInset(edge: .bottom) {
-                    DeleteBar(category: category, tracker: tracker, deleteAll: { await delete($0) }) { ids, anchor in
-                        await delete(ids)
-                        // The photos above are gone, so everything below moves up. Go back to where the
-                        // user was, or the next rows would slide past unseen.
-                        await Task.yield()
-                        if let anchor { proxy.scrollTo(anchor, anchor: .top) }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 0) {
+                        if let receipt = model.receipt {
+                            ReceiptStrip(receipt: receipt, explain: { explainedBatch = receipt.batch })
+                        }
+                        DeleteBar(category: category, tracker: tracker, deleteAll: { await delete($0) }) { ids, anchor in
+                            await delete(ids)
+                            // The photos above are gone, so everything below moves up. Go back to where the
+                            // user was, or the next rows would slide past unseen.
+                            await Task.yield()
+                            if let anchor { proxy.scrollTo(anchor, anchor: .top) }
+                        }
                     }
                 }
         }
@@ -80,6 +100,11 @@ struct ReviewView: View {
             }
         }
         .sheet(item: $preview) { PreviewView(id: $0.id) }
+        .sheet(item: $explainedBatch) { DeletionSummaryView(summary: $0) }
+        .onChange(of: model.receipt) { _, receipt in
+            if let receipt { UIAccessibility.post(notification: .announcement, argument: receipt.spokenText) }
+        }
+        .onDisappear { model.dismissReceipt() }
         .alert(
             "Could not delete",
             isPresented: Binding(get: { model.deletionError != nil }, set: { _ in model.dismissDeletionError() })
@@ -119,6 +144,7 @@ struct ReviewView: View {
             }
         }
         .coordinateSpace(.named(scrollSpace))
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tracker.viewportHeight = $0 }
     }
 
     @ViewBuilder private func leftOutCaption(_ count: Int) -> some View {
@@ -199,10 +225,12 @@ struct ReviewView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("cell-\(item.id)")
-        .onGeometryChange(for: Bool.self) { proxy in
-            proxy.frame(in: .named(scrollSpace)).maxY <= 0
-        } action: { scrolledPast in
-            tracker.update(item.id, scrolledPast: scrolledPast)
+        .onGeometryChange(for: CellPosition.self) { proxy in
+            let frame = proxy.frame(in: .named(scrollSpace))
+            if frame.maxY <= 0 { return .above }
+            return frame.minY >= tracker.viewportHeight ? .below : .onScreen
+        } action: { position in
+            tracker.update(item.id, position)
         }
         .onDisappear { tracker.forget(item.id) }
         .contextMenu {
@@ -252,8 +280,20 @@ private struct DeleteBar: View {
         let bytes = model.result?.byteSize(of: ids) ?? 0
         let top = model.firstShown(in: category, among: tracker.notScrolledPast)
         let above = top.map { model.selectedIDs(in: category, above: $0, scrolledPast: tracker.scrolledPast) } ?? []
+        let hasAbove = !above.isEmpty
+        let deleteAllButton = Button {
+            Task { await deleteAll(ids) }
+        } label: {
+            Text(ids.isEmpty
+                ? "Select items to delete"
+                : "\(hasAbove ? "Delete all" : "Delete") \(ids.count.formatted()) · \(bytes.formatted(.byteCount(style: .file)))")
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+        }
+        .disabled(ids.isEmpty)
         return HStack(spacing: 10) {
-            if !above.isEmpty {
+            if hasAbove {
                 Button {
                     Task { await deleteAbove(above, top) }
                 } label: {
@@ -261,27 +301,77 @@ private struct DeleteBar: View {
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("delete-above")
             }
-            Button {
-                Task { await deleteAll(ids) }
-            } label: {
-                Text(ids.isEmpty
-                    ? "Select items to delete"
-                    : "Delete \(ids.count.formatted()) · \(bytes.formatted(.byteCount(style: .file)))")
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity)
+            if hasAbove {
+                deleteAllButton.buttonStyle(.bordered)
+            } else {
+                deleteAllButton.buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(ids.isEmpty)
         }
         .tint(.accentColor)
         .controlSize(.large)
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.bar)
+    }
+}
+
+private struct ReceiptStrip: View {
+    let receipt: DeletionReceipt
+    let explain: () -> Void
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(receipt.deletedText).font(.subheadline.weight(.semibold))
+                    Text("They stay in Recently Deleted for 30 days.")
+                    Text(receipt.sessionText)
+                }
+                .font(.footnote)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                Button("Dismiss", systemImage: "xmark") { model.dismissReceipt() }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("receipt-dismiss")
+            }
+            Button("How to empty Recently Deleted", action: explain)
+                .font(.footnote)
+        }
+        .padding(.horizontal)
+        .padding(.top, 10)
+        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("receipt-strip")
+    }
+}
+
+extension DeletionReceipt {
+    private static func items(_ count: Int) -> String {
+        "\(count.formatted()) \(count == 1 ? "item" : "items")"
+    }
+
+    private static func amount(count: Int, bytes: Int64) -> String {
+        bytes > 0 ? "\(items(count)), \(bytes.formatted(.byteCount(style: .file)))" : items(count)
+    }
+
+    var deletedText: String {
+        let kept = batch.keptChanged > 0 ? " \(batch.keptChanged.formatted()) changed after the scan and kept." : ""
+        return "Deleted \(Self.amount(count: batch.count, bytes: batch.bytes)).\(kept)"
+    }
+
+    var sessionText: String {
+        "This session: \(Self.amount(count: total.count, bytes: total.bytes))."
+    }
+
+    var spokenText: String {
+        "\(deletedText) They stay in Recently Deleted for 30 days. \(sessionText)"
     }
 }
 

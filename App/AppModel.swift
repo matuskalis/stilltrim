@@ -12,6 +12,13 @@ struct DeletionSummary: Identifiable, Equatable {
     var keptChanged = 0
 }
 
+/// The strip shown in the review list after every delete but the first of a launch.
+struct DeletionReceipt: Identifiable, Equatable {
+    let id = UUID()
+    let batch: DeletionSummary
+    let total: SessionTally
+}
+
 @MainActor
 final class ThumbnailLoader {
     private let library: PhotoLibraryService
@@ -47,6 +54,8 @@ final class AppModel {
     private(set) var scanState: ScanState = .idle
     private var review = ReviewState()
     private(set) var lastDeletion: DeletionSummary?
+    private(set) var receipt: DeletionReceipt?
+    @ObservationIgnored private var sessionTally = SessionTally()
     private(set) var deletionError: String?
     var debugOpenCategory: CleanupCategory?
 
@@ -208,8 +217,16 @@ final class AppModel {
         review.remove(ids: requested)
         await cache.remove(ids: Array(requested))
         await cache.save()
-        if !deleted.isEmpty || !gate.changed.isEmpty {
-            lastDeletion = DeletionSummary(count: deleted.count, bytes: bytes, keptChanged: gate.changed.count)
+        guard !deleted.isEmpty || !gate.changed.isEmpty else { return }
+        let summary = DeletionSummary(count: deleted.count, bytes: bytes, keptChanged: gate.changed.count)
+        let isFirstDelete = sessionTally.batches == 0
+        if !deleted.isEmpty { sessionTally = sessionTally.adding(count: deleted.count, bytes: bytes) }
+        // The full sheet explains Recently Deleted once per launch, the strip covers every later delete.
+        if deleted.isEmpty || isFirstDelete {
+            receipt = nil
+            lastDeletion = summary
+        } else {
+            receipt = DeletionReceipt(batch: summary, total: sessionTally)
         }
     }
 
@@ -238,6 +255,10 @@ final class AppModel {
 
     func dismissDeletionSummary() {
         lastDeletion = nil
+    }
+
+    func dismissReceipt() {
+        receipt = nil
     }
 
     func dismissDeletionError() {

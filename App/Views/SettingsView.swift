@@ -3,7 +3,7 @@ import SwiftUI
 
 struct DeletionSummaryView: View {
     let summary: DeletionSummary
-    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
 
     private var keptChangedText: String {
         summary.keptChanged == 1
@@ -34,7 +34,7 @@ struct DeletionSummaryView: View {
                 }
             }
             Spacer()
-            Button("Done") { model.dismissDeletionSummary() }
+            Button("Done") { dismiss() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
