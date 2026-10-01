@@ -18,6 +18,8 @@ actor AnalysisCache {
         var modificationDate: Date?
         var byteSize: Int64
         var isEdited: Bool
+        /// Bytes of the photo resource only. Nil in entries stored before it existed: `addSizes` fills it in once.
+        var stillBytes: Int64?
         var metrics: ImageMetrics?
         var fingerprint: Data?
         var screenshotKind: ScreenshotKind?

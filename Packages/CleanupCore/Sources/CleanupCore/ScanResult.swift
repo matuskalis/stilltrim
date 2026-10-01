@@ -63,8 +63,16 @@ public struct SimilarGroup: Identifiable, Sendable, Hashable {
     public private(set) var suggestedRemovalIDs: Set<String>
     /// Every member from best to worst. Picks the next best photo when the current one goes.
     public let rankedIDs: [String]
+    public let confidence: KeeperConfidence
+    /// Why the best photo is best. Nil once the best photo was removed and another took its place.
+    public let reasonLine: String?
 
-    public init(id: String, items: [CleanupItem], suggestedRemovalIDs: Set<String>, rankedIDs: [String]) {
+    public init(
+        id: String, items: [CleanupItem], suggestedRemovalIDs: Set<String>, rankedIDs: [String],
+        confidence: KeeperConfidence = .clear, reasonLine: String? = nil
+    ) {
+        self.confidence = confidence
+        self.reasonLine = reasonLine
         self.id = id
         self.items = items
         self.suggestedRemovalIDs = suggestedRemovalIDs
@@ -86,13 +94,18 @@ public struct SimilarGroup: Identifiable, Sendable, Hashable {
         var remaining = items.filter { !ids.contains($0.id) }
         guard remaining.count > 1 else { return nil }
         var suggested = suggestedRemovalIDs.subtracting(ids)
+        var line = reasonLine
         if !remaining.contains(where: \.isKeeper),
            let promoted = rankedIDs.first(where: { id in remaining.contains { $0.id == id } }),
            let index = remaining.firstIndex(where: { $0.id == promoted }) {
             remaining[index].isKeeper = true
             suggested.remove(promoted)
+            line = nil
         }
-        return SimilarGroup(id: id, items: remaining, suggestedRemovalIDs: suggested, rankedIDs: rankedIDs)
+        return SimilarGroup(
+            id: id, items: remaining, suggestedRemovalIDs: suggested, rankedIDs: rankedIDs,
+            confidence: confidence, reasonLine: line
+        )
     }
 }
 
@@ -193,7 +206,7 @@ public struct ScanResult: Sendable {
         return total
     }
 
-    /// The non-best photos of every similar group, minus favourites and edited photos.
+    /// The non-best photos of every similar group, minus favourites and edited photos. A close call suggests none.
     public var suggestedSelection: Set<String> {
         similarGroups.reduce(into: Set<String>()) { $0.formUnion($1.suggestedRemovalIDs) }
     }

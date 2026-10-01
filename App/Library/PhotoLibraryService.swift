@@ -22,6 +22,8 @@ struct AssetRecord: Sendable, Identifiable, Hashable {
 
 struct AssetDetails: Sendable {
     let byteSize: Int64
+    /// The photo resources only: no paired video, no RAW alternate.
+    let stillBytes: Int64
     let isEdited: Bool
 }
 
@@ -85,7 +87,8 @@ actor PhotoLibraryService {
     }
 
     /// Byte size sums every resource of the asset (original, edited render, paired video),
-    /// counting only what is on this phone. `fileSize` and `locallyAvailable` are not public API,
+    /// counting only what is on this phone. Still bytes sum the primary photo resources only (`.photo`), so a Live
+    /// Photo's video, an edited render and a RAW alternate do not count as detail. `fileSize` and `locallyAvailable` are not public API,
     /// so each key is checked before use.
     func details(for ids: [String]) -> [String: AssetDetails] {
         let sizeKey = "fileSize", localKey = "locallyAvailable"
@@ -94,16 +97,19 @@ actor PhotoLibraryService {
         for id in ids {
             guard let asset = asset(for: id) else { continue }
             var bytes: Int64 = 0
+            var stillBytes: Int64 = 0
             var edited = false
             for resource in PHAssetResource.assetResources(for: asset) {
                 if resource.type == .adjustmentData || resource.type == .fullSizePhoto { edited = true }
                 if resource.responds(to: Selector((localKey))),
                    (resource.value(forKey: localKey) as? NSNumber)?.boolValue == false { continue }
                 if resource.responds(to: Selector((sizeKey))) {
-                    bytes += (resource.value(forKey: sizeKey) as? NSNumber)?.int64Value ?? 0
+                    let size = (resource.value(forKey: sizeKey) as? NSNumber)?.int64Value ?? 0
+                    bytes += size
+                    if resource.type == .photo { stillBytes += size }
                 }
             }
-            details[id] = AssetDetails(byteSize: bytes, isEdited: edited)
+            details[id] = AssetDetails(byteSize: bytes, stillBytes: stillBytes, isEdited: edited)
         }
         return details
     }
