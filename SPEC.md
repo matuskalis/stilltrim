@@ -113,6 +113,8 @@ Two independent Opus reviews. The first found 8 issues: a single broken photo ma
 
 The second checked those fixes and found 3 more: a photo promoted to best after a deletion stayed selected (one tap on Delete could remove a whole burst), library changes during a scan were lost, and a thumbnail request could not be cancelled or time out. All fixed. The first is covered by `ReviewStateTests`, the other two by `ScanControl` UI tests on a 2,000 photo library (cancel, and erase in the middle of a scan).
 
+Layout rule: a similar group is one strip. Groups of 2 and 3 photos fill the row with 2 or 3 equal square tiles (thumbnails fetched at 600 px); groups of 4 or more, screenshot sections and the plain grids (blurry, big videos) keep the adaptive grid. Similar groups sit in one lazy stack with unpinned, quiet headers (footnote title, the keeper reason as secondary text under it); screenshot sections stay one grid with pinned headers. Cell ids, order and per-cell geometry reporting are the same in every layout.
+
 ## Next
 
 1. Look up sizes only for candidates (screenshots, videos, group members, flagged photos), not for every asset.
