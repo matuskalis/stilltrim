@@ -66,6 +66,8 @@ struct ScanProgress: Sendable, Equatable {
     var stage: Stage
     var done: Int
     var total: Int
+    /// Set once the pipeline knows how much work is pending; the app model carries it into later updates.
+    var plan: ScanWorkPlan?
 
     var fraction: Double? {
         total > 0 ? Double(done) / Double(total) : nil
