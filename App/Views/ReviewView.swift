@@ -9,6 +9,8 @@ private struct PreviewTarget: Identifiable {
 }
 
 private let scrollSpace = "review-scroll"
+/// How far a finger moves before the list decides between scrolling and swiping across photos.
+private let swipeSlop: CGFloat = 10
 
 private enum CellPosition {
     case above, onScreen, below
@@ -52,6 +54,51 @@ private final class ScrollTracker {
     }
 }
 
+/// Where the finger-swipe selection of one grid stands. A plain reference type, not observed state: the
+/// frames change on every scroll frame and nothing should redraw for them. Only the cells and pinned
+/// headers of the grids that can be swiped report here, in the scroll view's coordinate space.
+@MainActor
+private final class SwipeSelection {
+    enum Phase {
+        case idle, scrolling, selecting
+    }
+
+    var cellFrames: [String: CGRect] = [:]
+    var headerFrames: [String: CGRect] = [:]
+    var phase = Phase.idle
+    var touchStart: CGPoint?
+    var drag: DragSelection?
+    var applied: Set<String> = []
+    var lastCell: String?
+    /// A swipe that ends on the cell it began on would also reach that cell's button as a tap.
+    var swallowTap = false
+
+    func cell(at point: CGPoint) -> String? {
+        if headerFrames.values.contains(where: { $0.contains(point) }) { return nil }
+        return cellFrames.first { $0.value.contains(point) }?.key
+    }
+}
+
+private struct ReportsFrame: ViewModifier {
+    let swipe: SwipeSelection?
+    let id: String
+    let isHeader: Bool
+
+    func body(content: Content) -> some View {
+        if let swipe {
+            content
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(scrollSpace)) } action: { frame in
+                    if isHeader { swipe.headerFrames[id] = frame } else { swipe.cellFrames[id] = frame }
+                }
+                .onDisappear {
+                    if isHeader { swipe.headerFrames[id] = nil } else { swipe.cellFrames[id] = nil }
+                }
+        } else {
+            content
+        }
+    }
+}
+
 /// One heading and its photos. A category without headings is one section with no title.
 private struct ReviewSection: Identifiable {
     let id: String
@@ -70,6 +117,8 @@ struct ReviewView: View {
     @State private var preview: PreviewTarget?
     @State private var explainedBatch: DeletionSummary?
     @State private var tracker = ScrollTracker()
+    @State private var swipe = SwipeSelection()
+    @State private var isSwiping = false
     @State private var selectTicks = 0
     @State private var bulkSelects = 0
     @State private var deletions = 0
@@ -150,14 +199,79 @@ struct ReviewView: View {
                                 }
                             }
                         }
+                        .simultaneousGesture(swipeGesture)
                     }
                 }
             }
         }
+        .scrollDisabled(isSwiping)
         .coordinateSpace(.named(scrollSpace))
         .onGeometryChange(for: ClosedRange<CGFloat>.self) { proxy in
             proxy.safeAreaInsets.top...max(proxy.safeAreaInsets.top, proxy.size.height - proxy.safeAreaInsets.bottom)
         } action: { tracker.visibleTop = $0.lowerBound; tracker.visibleBottom = $0.upperBound }
+    }
+
+    /// A swipe that starts more across than down selects the photos it passes over, like the Photos app.
+    /// One that starts more down than across is left to the list to scroll.
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: swipeSlop, coordinateSpace: .named(scrollSpace))
+            .onChanged(swipeChanged)
+            .onEnded { _ in swipeEnded() }
+    }
+
+    private func swipeChanged(_ value: DragGesture.Value) {
+        if swipe.touchStart != value.startLocation {
+            swipe.touchStart = value.startLocation
+            swipe.phase = .idle
+        }
+        switch swipe.phase {
+        case .scrolling: return
+        case .idle: beginSwipe(value)
+        case .selecting: break
+        }
+        guard swipe.phase == .selecting, let cell = swipe.cell(at: value.location), cell != swipe.lastCell else { return }
+        swipe.lastCell = cell
+        applySwipe(through: cell)
+    }
+
+    private func beginSwipe(_ value: DragGesture.Value) {
+        guard abs(value.translation.width) > abs(value.translation.height),
+              let anchor = swipe.cell(at: value.startLocation),
+              let order = model.result?.items(in: category).map(\.id)
+        else {
+            swipe.phase = .scrolling
+            return
+        }
+        swipe.phase = .selecting
+        swipe.drag = DragSelection(order: order, startSelection: model.selection, anchor: anchor)
+        swipe.applied = model.selection
+        swipe.lastCell = nil
+        isSwiping = true
+    }
+
+    /// Changes the selection only by what moved since the last change, so a long swipe is one update per
+    /// photo reached, and gives one haptic tick for it.
+    private func applySwipe(through cell: String) {
+        guard let drag = swipe.drag else { return }
+        let selection = drag.selection(through: cell)
+        let added = selection.subtracting(swipe.applied)
+        let removed = swipe.applied.subtracting(selection)
+        guard !added.isEmpty || !removed.isEmpty else { return }
+        if !added.isEmpty { model.select(ids: added) }
+        if !removed.isEmpty { model.deselect(ids: removed) }
+        swipe.applied = selection
+        selectTicks += 1
+    }
+
+    private func swipeEnded() {
+        let wasSelecting = swipe.phase == .selecting
+        swipe.phase = .idle
+        swipe.touchStart = nil
+        swipe.drag = nil
+        isSwiping = false
+        guard wasSelecting else { return }
+        swipe.swallowTap = true
+        Task { swipe.swallowTap = false }
     }
 
     /// A strip per group, so a pair or a trio fills its row. One lazy stack of groups keeps the cells lazy;
@@ -260,6 +374,7 @@ struct ReviewView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background { if pinned { Rectangle().fill(.bar) } }
             .accessibilityAddTraits(.isHeader)
+            .modifier(ReportsFrame(swipe: pinned ? swipe : nil, id: section.id, isHeader: true))
         }
     }
 
@@ -279,6 +394,7 @@ struct ReviewView: View {
 
     private func cell(_ item: CleanupItem, side: CGFloat = DesignTokens.Review.tileSide) -> some View {
         Button {
+            guard !swipe.swallowTap else { return }
             selectTicks += 1
             model.toggle(item.id)
         } label: {
@@ -294,6 +410,7 @@ struct ReviewView: View {
             tracker.update(item.id, position)
         }
         .onDisappear { tracker.forget(item.id) }
+        .modifier(ReportsFrame(swipe: category == .similar ? nil : swipe, id: item.id, isHeader: false))
         .contextMenu {
             Button("Preview", systemImage: "eye") { preview = PreviewTarget(id: item.id, isVideo: item.duration != nil) }
             if !item.isKeeper {
