@@ -195,6 +195,8 @@ public enum SimilarityGrouper {
             return !(verdict.winner > 0 && verdict.isClear)
         }
         let isClose = contenders.contains { !$0.isFavorite && !$0.isEdited }
+        let keeperReason: KeeperReason = runnerUp.reason == .tie && !isClose
+            ? (keeper.isFavorite ? .favourite : .edited) : runnerUp.reason
         return SimilarityGroup(
             keeperID: keeper.id,
             memberIDs: members.map(\.id),
@@ -202,12 +204,12 @@ public enum SimilarityGrouper {
             suggestedRemovalIDs: isClose ? [] : members
                 .filter { $0.id != keeper.id && !$0.isFavorite && !$0.isEdited }
                 .map(\.id),
-            keeperReason: runnerUp.reason,
+            keeperReason: keeperReason,
             confidence: isClose ? .close : .clear,
             contenderIDs: contenders.map(\.id),
             reasonLine: isClose
                 ? closeCallLine
-                : reasonLine(keeper: keeper, runnerUp: reference, others: ranked.dropFirst(), reason: runnerUp.reason)
+                : reasonLine(keeper: keeper, runnerUp: reference, others: ranked.dropFirst(), reason: keeperReason)
         )
     }
 
@@ -216,10 +218,15 @@ public enum SimilarityGrouper {
     private static func reasonLine(
         keeper: GroupingItem, runnerUp: GroupingItem, others: ArraySlice<GroupingItem>, reason: KeeperReason
     ) -> String {
-        func percent(_ better: Double, _ worse: Double) -> Int { Int(((better / worse - 1) * 100).rounded()) }
+        func percent(_ better: Double, _ worse: Double) -> Int? {
+            guard better > 0, worse > 0 else { return nil }
+            let gain = ((better / worse - 1) * 100).rounded()
+            return gain.isFinite ? Int(gain) : nil
+        }
+        func suffix(_ gain: Int?) -> String { gain.map { " (+\($0)%)" } ?? "" }
         func megapixels(_ item: GroupingItem) -> Int { Int((Double(item.pixelCount) / 1_000_000).rounded()) }
-        let sizeGain = percent(Double(KeeperPolicy.bytes(keeper)), Double(KeeperPolicy.bytes(runnerUp)))
-        let sharpnessGain = percent(keeper.sharpness ?? 1, runnerUp.sharpness ?? 1)
+        func sizeGain() -> Int? { percent(Double(KeeperPolicy.bytes(keeper)), Double(KeeperPolicy.bytes(runnerUp))) }
+        func sharpnessGain() -> Int? { percent(keeper.sharpness ?? 0, runnerUp.sharpness ?? 0) }
         switch reason {
         case .favourite: return "Best: you marked it as a favourite."
         case .edited: return "Best: you edited it."
@@ -229,9 +236,9 @@ public enum SimilarityGrouper {
             let worse = others.filter { ($0.faces?.closedEyes ?? 0) > (keeper.faces?.closedEyes ?? 0) }.count
             return worse == 1 ? "Best: eyes open. 1 other has closed eyes."
                 : "Best: eyes open. \(worse) others have closed eyes."
-        case .sizeAndSharpness: return "Best: sharper, larger file (+\(sizeGain)%)."
-        case .size: return "Best: larger file, more detail (+\(sizeGain)%)."
-        case .sharpness: return "Best: sharper (+\(sharpnessGain)%)."
+        case .sizeAndSharpness: return "Best: sharper, larger file\(suffix(sizeGain()))."
+        case .size: return "Best: larger file, more detail\(suffix(sizeGain()))."
+        case .sharpness: return "Best: sharper\(suffix(sharpnessGain()))."
         case .tie: return closeCallLine
         }
     }

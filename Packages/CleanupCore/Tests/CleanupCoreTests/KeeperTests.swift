@@ -211,4 +211,46 @@ import Testing
             }
         }
     }
+
+    @Test func zeroByteMembersNeverCrashTheReasonLine() {
+        let resolution = group([item("a", seconds: 0, bytes: 0, pixels: 8_000_000), item("b", seconds: 1, bytes: 3_000_000)])
+        #expect(resolution.reasonLine == "Best: more pixels (12 MP, the others 8 MP).")
+        let favourite = group([item("a", seconds: 0, bytes: 0), item("b", seconds: 1, bytes: 3_000_000, favorite: true)])
+        #expect(favourite.keeperReason == .favourite)
+        let edited = group([item("a", seconds: 0, bytes: 0), item("b", seconds: 1, bytes: 3_000_000, edited: true)])
+        #expect(edited.keeperReason == .edited)
+        let bothZero = group([item("a", seconds: 0, bytes: 0), item("b", seconds: 1, bytes: 0)])
+        #expect(bothZero.confidence == .close)
+        let stillZero = group([item("a", seconds: 0, bytes: 0, still: 0), item("b", seconds: 1, bytes: 3_000_000)])
+        #expect(stillZero.keeperID == "b")
+        #expect(stillZero.confidence == .close)
+    }
+
+    @Test func zeroOrOddSharpnessGivesAPlainLine() {
+        let zero = group([
+            item("a", seconds: 0, bytes: 1_000_000, sharpness: 0),
+            item("b", seconds: 1, bytes: 1_000_000, sharpness: 2.0),
+        ])
+        #expect(zero.confidence == .close)
+        let nan = group([
+            item("a", seconds: 0, bytes: 1_000_000, sharpness: .nan),
+            item("b", seconds: 1, bytes: 2_000_000, sharpness: .infinity),
+        ])
+        #expect(nan.keeperID == "b")
+        let huge = group([
+            item("a", seconds: 0, bytes: 1_000_000, sharpness: 1e-300),
+            item("b", seconds: 1, bytes: 1_000_000, sharpness: 1e300),
+        ])
+        #expect(huge.keeperReason == .sharpness)
+        #expect(huge.reasonLine == "Best: sharper.")
+    }
+
+    @Test func aTieOnlyAgainstProtectedPhotosIsNotACloseCall() {
+        let result = group([item("fav", seconds: 0, favorite: true), item("fav2", seconds: 1, favorite: true)])
+        #expect(result.confidence == .clear)
+        #expect(result.keeperReason == .favourite)
+        #expect(!result.reasonLine.contains("Close call"))
+        let edited = group([item("e1", seconds: 0, edited: true), item("e2", seconds: 1, edited: true)])
+        #expect(edited.reasonLine == "Best: you edited it.")
+    }
 }
